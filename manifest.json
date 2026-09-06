@@ -1,0 +1,28 @@
+{
+   "background": {
+      "service_worker": "js/background.js",
+      "type": "module"
+   },
+   "action": {
+      "default_icon": {
+         "19": "icons/c19.png",
+         "38": "icons/c38.png"
+      },
+      "default_title": "__MSG_name__"
+   },
+   "default_locale": "en",
+   "description": "__MSG_description__",
+   "icons": {
+      "128": "icons/c128.png",
+      "16": "icons/c16.png",
+      "48": "icons/c48.png"
+   },
+   "incognito": "split",
+   "manifest_version": 3,
+   "minimum_chrome_version": "94",
+   "name": "__MSG_name__",
+   "options_page": "html/options.html",
+   "permissions": [ "tabs", "storage", "alarms" ],
+   "host_permissions": [ "*://*.yandex.com/*", "*://*.yandex.by/*", "*://*.yandex.kz/*", "*://*.yandex.ru/*", "*://*.yandex.com.tr/*", "*://*.yandex.ua/*" ],
+   "version": "1.0.0"
+}

@@ -1,0 +1,61 @@
+{
+   "description": {
+      "message": "Secure check new Yandex Mail™."
+   },
+   "email": {
+      "message": "Yandex Mail"
+   },
+   "name": {
+      "message": "Watcher for Yandex Mail™"
+   },
+
+   "save": { "message": "Save" },
+   "saved": { "message": "Saved" },
+   "optionsBtn": { "message": "Options..." },
+   "checkNow": { "message": "Check now" },
+   "openMail": { "message": "Open mail" },
+
+   "optionsTitle": { "message": "Options" },
+   "langLegend": { "message": "Language" },
+   "langAuto": { "message": "Automatic (browser)" },
+   "siteLegend": { "message": "Email Site" },
+   "checkingLegend": { "message": "Email Checking" },
+   "inboxOnly": { "message": "Count only unread emails in Inbox" },
+   "autoCheckLegend": { "message": "Auto-check" },
+   "often": { "message": "Often" },
+   "never": { "message": "Never" },
+   "checkEvery": {
+      "message": "Check every: $INTERVAL$",
+      "placeholders": { "interval": { "content": "$1" } }
+   },
+   "minutesShort": { "message": "min" },
+   "hoursShort": { "message": "h" },
+   "autoCheckWarning": { "message": "Warning: checking more often than every 3 minutes may overload the mail server." },
+   "toolbarLegend": { "message": "Toolbar Icon" },
+   "showCounter": { "message": "Show counter on toolbar button" },
+   "showMenu": { "message": "Show menu on click" },
+   "clickBehavior": { "message": "Single click: open mail / Double click: check now" },
+   "openingLegend": { "message": "Opening Email" },
+   "resetCounterOpt": { "message": "Reset counter upon opening email" },
+   "reuseTab": { "message": "Reuse existing email tab first" },
+   "openCurrent": { "message": "Open email in current tab" },
+   "openNew": { "message": "Open email in new tab" },
+   "openBackground": { "message": "Open email in new background tab" },
+
+   "statusChecking": { "message": "Checking..." },
+   "statusUnread": {
+      "message": "Unread ($N$)",
+      "placeholders": { "n": { "content": "$1" } }
+   },
+   "statusEmpty": { "message": "No unread email" },
+   "statusLoggedOut": { "message": "Logged out" },
+   "statusDisconnected": { "message": "Not connected" },
+   "statusTimeout": { "message": "Request timeout" },
+   "statusUnknown": { "message": "Unrecognized response" },
+
+   "aboutTitle": { "message": "About" },
+   "versionLabel": {
+      "message": "Version $V$",
+      "placeholders": { "v": { "content": "$1" } }
+   }
+}
