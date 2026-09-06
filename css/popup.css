@@ -1,0 +1,79 @@
+/*================================================================
+  Popup menu - modern styling with light/dark support
+================================================================*/
+
+:root {
+	--bg: #ffffff;
+	--text: #1f2328;
+	--muted: #6b7280;
+	--border: #e3e6ea;
+	--hover: #f2f4f7;
+	--accent: #ec3a2f;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #1f232a;
+		--text: #e6e8eb;
+		--muted: #9aa3ad;
+		--border: #2c313a;
+		--hover: #2a2f38;
+	}
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	min-width: 180px;
+	padding: 4px;
+	background: var(--bg);
+	color: var(--text);
+	font: 13px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	user-select: none;
+}
+
+.menu {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.menu-item {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	padding: 6px 9px;
+	border-radius: 6px;
+	color: var(--text);
+	cursor: pointer;
+	transition: background 0.12s ease;
+}
+
+.menu-item:hover {
+	background: var(--hover);
+}
+
+.menu-item:active {
+	background: var(--border);
+}
+
+.menu-item svg {
+	flex: none;
+	width: 15px;
+	height: 15px;
+	color: var(--muted);
+}
+
+.menu-item.primary svg {
+	color: var(--accent);
+}
+
+.menu-sep {
+	height: 1px;
+	margin: 3px 8px;
+	background: var(--border);
+	border: none;
+}
