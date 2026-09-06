@@ -15,6 +15,7 @@
    "checkNow": { "message": "Проверить сейчас" },
    "openMail": { "message": "Открыть почту" },
 
+   "enableNotifications": { "message": "Показывать уведомление о новых письмах" },
    "optionsTitle": { "message": "Настройки" },
    "langLegend": { "message": "Язык" },
    "langAuto": { "message": "Автоматически (браузер)" },

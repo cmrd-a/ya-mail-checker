@@ -15,6 +15,7 @@
    "checkNow": { "message": "Check now" },
    "openMail": { "message": "Open mail" },
 
+   "enableNotifications": { "message": "Show desktop notification for new emails" },
    "optionsTitle": { "message": "Options" },
    "langLegend": { "message": "Language" },
    "langAuto": { "message": "Automatic (browser)" },

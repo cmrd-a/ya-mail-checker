@@ -37,6 +37,59 @@ const NUMBER_PATTERN = /^\d{1,3}(,\d\d\d)*$|^\d+$/;
 // The scraping logic is intentionally kept close to the original to preserve
 // the exact parsing behavior against Yandex lite markup. inboxPref mirrors the
 // old preference.inbox flag (also fold in custom-label counters when set).
+export function analyzeMessagesHTML(input) {
+	const messages = [];
+
+	let index = input.indexOf('class="b-messages"');
+	if (index === -1) return messages;
+
+	let output = input.substr(index);
+
+	const messageBlocks = [];
+	const regex = /<div[^>]*class="[^"]*(?:b-messages__message|b-message )[^"]*"[^>]*>([\s\S]*?)<\/div>(?=\s*(?:<div[^>]*class="[^"]*(?:b-messages__message|b-message )|<\/div>))/g;
+	let match;
+	while ((match = regex.exec(output)) !== null) {
+		messageBlocks.push(match[0]);
+	}
+
+	for (const block of messageBlocks) {
+		const isUnread = block.includes('b-message_unread') || block.includes('b-messages__message_unread');
+
+		let href = '';
+		const hrefMatch = block.match(/href="(\/lite\/message\/[^"]+)"/);
+		if (hrefMatch) href = hrefMatch[1];
+
+		let sender = '';
+		const senderTitleMatch = block.match(/class="[^"]*b-message__from[^"]*"[^>]*title="([^"]+)"/);
+		if (senderTitleMatch) {
+			sender = senderTitleMatch[1];
+		} else {
+			const senderMatch = block.match(/class="[^"]*b-message__from__text[^"]*"[^>]*>([^<]+)<\/span>/) || block.match(/class="[^"]*b-messages__message__sender[^"]*"[^>]*>([^<]+)<\/span>/);
+			if (senderMatch) sender = senderMatch[1].trim();
+		}
+
+		let subject = '';
+		const subjectMatch = block.match(/class="[^"]*b-message__subject__text[^"]*"[^>]*>([\s\S]*?)<\/span>/) || block.match(/class="[^"]*b-messages__message__subject[^"]*"[^>]*>([\s\S]*?)<\/span>/);
+		if (subjectMatch) subject = subjectMatch[1].trim().replace(/&nbsp;/g, ' ').replace(/<[^>]+>/g, '');
+
+		let snippet = '';
+		const snippetMatch = block.match(/class="[^"]*b-message__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/) || block.match(/class="[^"]*b-messages__message__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/);
+		if (snippetMatch) snippet = snippetMatch[1].trim().replace(/&nbsp;/g, ' ').replace(/<[^>]+>/g, '');
+
+		if (href) {
+			messages.push({
+				isUnread,
+				href,
+				sender,
+				subject,
+				snippet
+			});
+		}
+	}
+
+	return messages;
+}
+
 export function analyzeHTML(input, inboxPref) {
 	let totalCount = -1;
 	let output = input;

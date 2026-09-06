@@ -10,14 +10,15 @@ const SITE_NAMES = ["yandex.com", "yandex.by", "yandex.kz", "yandex.ru", "yandex
 
 const DEFAULT_PREFERENCE = {
 	lang: "auto",
-	site: 0,
+	site: 3,
 	inbox: true,
 	interval: 30,
 	showToolbarNumber: true,
 	showPopup: true,
-	resetCounter: true,
+	resetCounter: false,
 	reUseExistingMailTab: true,
 	openBehavior: 1,
+	enableNotifications: true,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -91,6 +92,10 @@ function loadForm(prefs) {
 	$("openEmailInCurrentTab").checked = prefs.openBehavior === 0;
 	$("openEmailInNewTab").checked = prefs.openBehavior === 1;
 	$("openEmailInNewBackgroundTab").checked = prefs.openBehavior === 2;
+
+	if ($("enableNotifications")) {
+		$("enableNotifications").checked = prefs.enableNotifications;
+	}
 }
 
 // Collect a preferences object from the current form state.
@@ -113,6 +118,7 @@ function readForm() {
 		resetCounter: $("resetCounter").checked,
 		reUseExistingMailTab: $("reUseExistingMailTab").checked,
 		openBehavior,
+		enableNotifications: $("enableNotifications") ? $("enableNotifications").checked : true,
 	};
 }
 

@@ -1,7 +1,7 @@
 //================================================================
 // Yandex Mail checker - Manifest V3 service worker
 //================================================================
-import { analyzeHTML, checkEmailURL, emailURL, matchPattern } from "./edition.js";
+import { analyzeHTML, analyzeMessagesHTML, checkEmailURL, emailURL, matchPattern } from "./edition.js";
 
 const ALARM_NAME = "checkMail";
 const NEVER_INTERVAL = 0x7fffffff;
@@ -10,12 +10,12 @@ const DOUBLE_CLICK_MS = 1000;
 
 const DEFAULT_PREFERENCE = {
 	lang: "auto",
-	site: 0,
+	site: 3,
 	inbox: true,
 	interval: 30,
 	showToolbarNumber: true,
 	showPopup: true,
-	resetCounter: true,
+	resetCounter: false,
 	reUseExistingMailTab: true,
 	openBehavior: 1,
 };
@@ -32,6 +32,7 @@ let firstClickTime = 0;
 let clickTimer = null;
 let i18nMessages = {};
 let i18nLang = null;
+let lastUnreadCount = -1;
 
 
 //================================================
@@ -220,7 +221,7 @@ async function fetchText(method, url, body) {
 }
 
 // Follow the lite-inbox request/redirect chain and parse the unread count.
-async function fetchUnreadCount(prefs) {
+async function fetchUnreadCount(prefs, returnMessages = false) {
 	let method = "GET";
 	let url = checkEmailURL[prefs.site];
 	let body = null;
@@ -229,6 +230,9 @@ async function fetchUnreadCount(prefs) {
 		const text = await fetchText(method, url, body);
 		const result = analyzeHTML(text, prefs.inbox);
 		if (typeof result === "number" && !Number.isNaN(result)) {
+			if (returnMessages) {
+				return analyzeMessagesHTML(text);
+			}
 			return result;
 		}
 		const [verb, redirectURL, ...rest] = String(result).split(" ");
@@ -241,10 +245,15 @@ async function fetchUnreadCount(prefs) {
 			url = redirectURL;
 			body = rest.join(" ");
 		} else {
-			return -1;
+			return returnMessages ? [] : -1;
 		}
 	}
-	return -1;
+	return returnMessages ? [] : -1;
+}
+
+// Fetch messages for the popup
+async function getMessages(prefs) {
+	return await fetchUnreadCount(prefs, true);
 }
 
 // Run a single mail check and reflect the result on the toolbar icon.
@@ -268,6 +277,21 @@ async function checkNow() {
 			applyState("empty", 0, prefs);
 		} else {
 			applyState("unread", count, prefs);
+
+			if (lastUnreadCount !== -1 && count > lastUnreadCount && prefs.enableNotifications) {
+				// Show notification for new emails
+				chrome.notifications.create({
+					type: "basic",
+					iconUrl: chrome.runtime.getURL("icons/c128.png"),
+					title: t("email") || "Yandex Mail",
+					message: t("statusUnread", [String(count)]),
+					silent: false // Try to play system notification sound
+				});
+			}
+		}
+
+		if (count >= 0) {
+			lastUnreadCount = count;
 		}
 	} catch (error) {
 		const timedOut = error === "timeout" || error?.name === "AbortError";
@@ -312,20 +336,24 @@ function resetCounterOnOpen(prefs) {
 }
 
 // Open Yandex Mail, optionally reusing an existing mail tab first.
-async function openMail() {
+async function openMail(specificUrl = null) {
 	const prefs = await getPreference();
 	await loadMessages(prefs);
+	let targetURL = emailURL[prefs.site];
+	if (specificUrl) {
+		targetURL = targetURL + specificUrl.replace(/^\/lite/, '');
+	}
 	if (prefs.reUseExistingMailTab) {
 		const tabs = await chrome.tabs.query({ windowType: "normal", url: matchPattern[prefs.site] });
 		if (tabs.length > 0) {
-			const tab = await chrome.tabs.update(tabs[0].id, { active: true });
+			const tab = await chrome.tabs.update(tabs[0].id, { url: targetURL, active: true });
 			if (tab) { await chrome.windows.update(tab.windowId, { focused: true }); }
-			resetCounterOnOpen(prefs);
+			if (prefs.resetCounter) resetCounterOnOpen(prefs);
 			return;
 		}
 	}
-	await openURL(emailURL[prefs.site], prefs.openBehavior);
-	resetCounterOnOpen(prefs);
+	await openURL(targetURL, prefs.openBehavior);
+	if (prefs.resetCounter) resetCounterOnOpen(prefs);
 }
 
 
@@ -376,6 +404,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 	if (alarm.name === ALARM_NAME) { checkNow(); }
 });
 
+chrome.notifications.onClicked.addListener((notificationId) => {
+	chrome.notifications.clear(notificationId);
+	openMail();
+});
+
 chrome.action.onClicked.addListener(() => {
 	// Only fires when no popup is set (single/double click mode).
 	if (firstClickTime === 0) {
@@ -391,10 +424,14 @@ chrome.action.onClicked.addListener(() => {
 	}
 });
 
-chrome.runtime.onMessage.addListener((message) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+	if (message?.type === "getMessages") {
+		getPreference().then(prefs => getMessages(prefs)).then(sendResponse).catch(() => sendResponse([]));
+		return true; // Keep the messaging channel open for sendResponse
+	}
 	switch (message?.type) {
 		case "openMail":
-			openMail();
+			openMail(message.url);
 			break;
 		case "checkNow":
 			checkNow();
