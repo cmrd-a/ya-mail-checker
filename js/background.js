@@ -382,11 +382,11 @@ async function openMail(specificUrl = null) {
 	await loadMessages(prefs);
 	let targetURL = emailURL[prefs.site];
 	if (specificUrl) {
-		// Popup hrefs are lite paths ("/lite/message/<id>", "/lite/thread/<id>").
-		// The full UI addresses the same message via a hash ("/#message/<id>");
-		// dropping just the "/lite" prefix yields a 404.
-		const path = specificUrl.replace(/^\/+/, "").replace(/^lite\//, "");
-		targetURL = `${targetURL}/#${path}`;
+		// specificUrl is a lite path from the popup ("/lite/message/<id>" or
+		// "/lite/thread/<id>"). Those ids are only valid in the lite UI - the
+		// full UI 404s on both "/message/<id>" and "/#message/<id>" - so open
+		// the message in the lite view.
+		targetURL += specificUrl.startsWith("/") ? specificUrl : `/${specificUrl}`;
 	}
 	if (prefs.reUseExistingMailTab) {
 		const tabs = await chrome.tabs.query({ windowType: "normal", url: matchPattern[prefs.site] });
