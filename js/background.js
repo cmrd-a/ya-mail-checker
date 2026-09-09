@@ -382,7 +382,11 @@ async function openMail(specificUrl = null) {
 	await loadMessages(prefs);
 	let targetURL = emailURL[prefs.site];
 	if (specificUrl) {
-		targetURL = targetURL + specificUrl.replace(/^\/lite/, '');
+		// Popup hrefs are lite paths ("/lite/message/<id>", "/lite/thread/<id>").
+		// The full UI addresses the same message via a hash ("/#message/<id>");
+		// dropping just the "/lite" prefix yields a 404.
+		const path = specificUrl.replace(/^\/+/, "").replace(/^lite\//, "");
+		targetURL = `${targetURL}/#${path}`;
 	}
 	if (prefs.reUseExistingMailTab) {
 		const tabs = await chrome.tabs.query({ windowType: "normal", url: matchPattern[prefs.site] });
