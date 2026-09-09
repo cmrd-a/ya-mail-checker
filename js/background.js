@@ -25,8 +25,9 @@ const BADGE_COLOR = [211, 47, 47, 255];
 const AVAILABLE_LANGS = ["en", "ru"];
 
 // In-memory (non-persistent) state.
-let colorIcons = null;
-let grayIcons = null;
+const iconCache = { color: null, "mono-light": null, "mono-dark": null };
+let darkTheme = false;
+let lastIconActive = null;
 let checking = false;
 let firstClickTime = 0;
 let clickTimer = null;
@@ -96,10 +97,19 @@ function t(key, subs) {
 //================================================
 // Icons
 //================================================
+// Silhouette fill colors for the inactive icon, tuned for each toolbar theme.
+const MONO_FILL = {
+	"mono-light": [0x5f, 0x63, 0x68],
+	"mono-dark": [0xe8, 0xea, 0xed],
+};
+
 // Build ImageData from PNG files. setIcon with imageData is reliable in a
 // service worker, unlike setIcon with a path which can fail to fetch.
-async function loadIconSet(grayscale) {
+// variant: "color" keeps the artwork; "mono-light" / "mono-dark" recolor it
+// into a flat silhouette (using the source alpha) that reads on that theme.
+async function loadIconSet(variant) {
 	const sources = { 19: "icons/c19.png", 38: "icons/c38.png" };
+	const fill = MONO_FILL[variant];
 	const entries = await Promise.all(
 		[19, 38].map(async (size) => {
 			const response = await fetch(chrome.runtime.getURL(sources[size]));
@@ -109,11 +119,12 @@ async function loadIconSet(grayscale) {
 			const ctx = canvas.getContext("2d");
 			ctx.drawImage(bitmap, 0, 0, size, size);
 			const imageData = ctx.getImageData(0, 0, size, size);
-			if (grayscale) {
+			if (fill) {
 				const { data } = imageData;
 				for (let i = 0; i < data.length; i += 4) {
-					const gray = Math.round(0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2]);
-					data[i] = data[i + 1] = data[i + 2] = gray;
+					data[i] = fill[0];
+					data[i + 1] = fill[1];
+					data[i + 2] = fill[2];
 				}
 			}
 			return [size, imageData];
@@ -122,26 +133,56 @@ async function loadIconSet(grayscale) {
 	return Object.fromEntries(entries);
 }
 
-// Cached color icon set (shown when logged in / has mail).
-async function getColorIcons() {
-	colorIcons ??= await loadIconSet(false);
-	return colorIcons;
+// Cached icon set for a given variant (loaded lazily, reused afterwards).
+async function getIcons(variant) {
+	iconCache[variant] ??= await loadIconSet(variant);
+	return iconCache[variant];
 }
 
-// Cached grayscale icon set (shown when logged out / error states).
-async function getGrayIcons() {
-	grayIcons ??= await loadIconSet(true);
-	return grayIcons;
-}
-
-// Swap the toolbar icon between the color (active) and gray (inactive) sets.
+// Swap the toolbar icon between the color (active) and silhouette (inactive)
+// sets, picking the silhouette that matches the current browser theme.
 async function setActionIcon(active) {
+	lastIconActive = active;
 	try {
-		const icons = active ? await getColorIcons() : await getGrayIcons();
+		const variant = active ? "color" : (darkTheme ? "mono-dark" : "mono-light");
+		const icons = await getIcons(variant);
 		await chrome.action.setIcon({ imageData: { 19: icons[19], 38: icons[38] } });
 	} catch {
 		// Ignore transient icon-loading failures.
 	}
+}
+
+// React to a browser light/dark theme change reported by the offscreen page.
+function setDarkTheme(isDark) {
+	if (darkTheme === isDark) { return; }
+	darkTheme = isDark;
+	if (lastIconActive !== null) { setActionIcon(lastIconActive); }
+}
+
+
+//================================================
+// Offscreen document (theme detection)
+//================================================
+// Service workers have no matchMedia, so a tiny offscreen page watches
+// prefers-color-scheme and messages us whenever it flips.
+const OFFSCREEN_DOCUMENT = "html/offscreen.html";
+let offscreenReady = null;
+
+async function ensureOffscreenDocument() {
+	if (!chrome.offscreen) { return; }
+	offscreenReady ??= (async () => {
+		try {
+			if (await chrome.offscreen.hasDocument?.()) { return; }
+			await chrome.offscreen.createDocument({
+				url: OFFSCREEN_DOCUMENT,
+				reasons: ["MATCH_MEDIA"],
+				justification: "Detect the browser light/dark theme to adapt the toolbar icon.",
+			});
+		} catch {
+			// A concurrent wakeup may have created it already; ignore.
+		}
+	})();
+	return offscreenReady;
 }
 
 
@@ -389,6 +430,7 @@ function applyPopupSetting(prefs) {
 async function initialize() {
 	const prefs = await getPreference();
 	applyPopupSetting(prefs);
+	ensureOffscreenDocument();
 	await ensureAlarm(prefs);
 	checkNow();
 }
@@ -428,6 +470,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 	if (message?.type === "getMessages") {
 		getPreference().then(prefs => getMessages(prefs)).then(sendResponse).catch(() => sendResponse([]));
 		return true; // Keep the messaging channel open for sendResponse
+	}
+	if (message?.type === "themeChanged") {
+		setDarkTheme(!!message.dark);
+		return false;
 	}
 	switch (message?.type) {
 		case "openMail":

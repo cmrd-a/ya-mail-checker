@@ -84,12 +84,14 @@ js/
   i18n.js                # Загрузчик локали по выбору пользователя + локализация страниц
   options.js             # Логика страницы настроек
   popup.js               # Логика меню‑попапа
+  offscreen.js           # Offscreen‑страница: сообщает worker'у о светлой/тёмной теме браузера
 ```
 
 ## Как это работает
 
 - **Service worker** (`background.js`) по будильнику (`chrome.alarms`) запрашивает страницу lite‑инбокса (`fetch` с `credentials: "include"`), парсит её через `analyzeHTML` и обновляет иконку/бейдж/тултип.
 - Иконки рисуются из PNG через `OffscreenCanvas` в `ImageData` — это надёжно работает в service worker (в отличие от `setIcon({ path })`).
+- **Тёмная тема**: неактивная иконка (выход из аккаунта / ошибки) рисуется силуэтом — тёмным на светлой панели инструментов и светлым на тёмной. Тему браузера отслеживает offscreen‑страница (`offscreen.html` + `offscreen.js`) через `matchMedia('(prefers-color-scheme: dark)')` и шлёт worker'у сообщение `themeChanged` (в service worker `matchMedia` недоступен). Требуется Chrome 116+ и разрешение `offscreen`.
 - **Локализация**: вместо `chrome.i18n` (который жёстко привязан к языку браузера) используется собственный загрузчик `_locales/<lang>/messages.json`, где `<lang>` берётся из настроек.
 - Настройки хранятся в `chrome.storage.local` под ключом `preference`; страница настроек шлёт сообщение `prefsUpdated`, по которому worker пересоздаёт будильник и сразу проверяет почту.
 
