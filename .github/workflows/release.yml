@@ -5,14 +5,21 @@ on:
     tags:
       - 'v*.*.*'
 
+# The release job needs to create a GitHub Release and upload assets.
 permissions:
   contents: write
 
+# Never run two releases for the same tag at once.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  build-and-release:
+  release:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -20,20 +27,27 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Build zip
+      - name: Verify tag matches manifest version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          MANIFEST_VERSION="$(node -p "require('./manifest.json').version")"
+          echo "tag=$TAG_VERSION  manifest=$MANIFEST_VERSION"
+          if [ "$TAG_VERSION" != "$MANIFEST_VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match manifest.json version $MANIFEST_VERSION"
+            exit 1
+          fi
+
+      - name: Build extension zip
         run: |
           chmod +x ./build.sh
           ./build.sh
-      - name: Get version from tag
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
-      - name: Create Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: Release ${{ env.VERSION }}
+          name: ${{ github.ref_name }}
           draft: false
           prerelease: false
+          generate_release_notes: true
+          fail_on_unmatched_files: true
           files: dist/*.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
