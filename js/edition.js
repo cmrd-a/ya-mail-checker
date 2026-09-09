@@ -56,7 +56,7 @@ export function analyzeMessagesHTML(input) {
 		const isUnread = block.includes('b-message_unread') || block.includes('b-messages__message_unread');
 
 		let href = '';
-		const hrefMatch = block.match(/href="(\/lite\/message\/[^"]+)"/);
+		const hrefMatch = block.match(/href="(\/lite\/(?:message|thread)\/[^"]+)"/);
 		if (hrefMatch) href = hrefMatch[1];
 
 		let sender = '';
@@ -64,16 +64,22 @@ export function analyzeMessagesHTML(input) {
 		if (senderTitleMatch) {
 			sender = senderTitleMatch[1];
 		} else {
-			const senderMatch = block.match(/class="[^"]*b-message__from__text[^"]*"[^>]*>([^<]+)<\/span>/) || block.match(/class="[^"]*b-messages__message__sender[^"]*"[^>]*>([^<]+)<\/span>/);
+			const senderMatch = block.match(/class="[^"]*b-message__from__text[^"]*"[^>]*>([^<]+)<\/span>/) || 
+			                    block.match(/class="[^"]*b-messages__message__sender[^"]*"[^>]*>([^<]+)<\/span>/) ||
+			                    block.match(/class="[^"]*b-messages__from__text[^"]*"[^>]*>(?:<span[^>]*>)?([^<]+)<\/span>/);
 			if (senderMatch) sender = senderMatch[1].trim();
 		}
 
 		let subject = '';
-		const subjectMatch = block.match(/class="[^"]*b-message__subject__text[^"]*"[^>]*>([\s\S]*?)<\/span>/) || block.match(/class="[^"]*b-messages__message__subject[^"]*"[^>]*>([\s\S]*?)<\/span>/);
+		const subjectMatch = block.match(/class="[^"]*b-message__subject__text[^"]*"[^>]*>([\s\S]*?)<\/span>/) || 
+		                     block.match(/class="[^"]*b-messages__message__subject[^"]*"[^>]*>([\s\S]*?)<\/span>/) ||
+		                     block.match(/class="[^"]*b-messages__subject[^"]*"[^>]*>(?:<span[^>]*>)?([\s\S]*?)<\/span>/);
 		if (subjectMatch) subject = subjectMatch[1].trim().replace(/&nbsp;/g, ' ').replace(/<[^>]+>/g, '');
 
 		let snippet = '';
-		const snippetMatch = block.match(/class="[^"]*b-message__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/) || block.match(/class="[^"]*b-messages__message__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/);
+		const snippetMatch = block.match(/class="[^"]*b-message__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/) || 
+		                     block.match(/class="[^"]*b-messages__message__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/) ||
+		                     block.match(/class="[^"]*b-messages__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/);
 		if (snippetMatch) snippet = snippetMatch[1].trim().replace(/&nbsp;/g, ' ').replace(/<[^>]+>/g, '');
 
 		if (href) {
