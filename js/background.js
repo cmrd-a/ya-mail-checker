@@ -298,7 +298,9 @@ async function getMessages(prefs) {
 }
 
 // Run a single mail check and reflect the result on the toolbar icon.
-async function checkNow() {
+// showProgress: whether to flash the "checking" indicator. Automatic update
+// checks (alarm-driven) pass false so the icon doesn't blink on every refresh.
+async function checkNow(showProgress = true) {
 	if (checking) { return; }
 	checking = true;
 
@@ -306,7 +308,7 @@ async function checkNow() {
 	try {
 		prefs = await getPreference();
 		await loadMessages(prefs);
-		setChecking();
+		if (showProgress) { setChecking(); }
 		const count = await fetchUnreadCount(prefs);
 		if (count === -3) {
 			applyState("disconnected", 0, prefs);
@@ -436,7 +438,7 @@ async function initialize() {
 	applyPopupSetting(prefs);
 	ensureOffscreenDocument();
 	await ensureAlarm(prefs);
-	checkNow();
+	checkNow(false);
 }
 
 
@@ -447,7 +449,7 @@ chrome.runtime.onInstalled.addListener(initialize);
 chrome.runtime.onStartup.addListener(initialize);
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-	if (alarm.name === ALARM_NAME) { checkNow(); }
+	if (alarm.name === ALARM_NAME) { checkNow(false); }
 });
 
 chrome.notifications.onClicked.addListener((notificationId) => {
@@ -490,7 +492,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 			getPreference().then((prefs) => {
 				applyPopupSetting(prefs);
 				rescheduleAlarm(prefs);
-				checkNow();
+				checkNow(false);
 			});
 			break;
 	}
