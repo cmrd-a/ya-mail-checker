@@ -3,10 +3,10 @@
 //================================================================
 "use strict";
 
+import { siteNames as SITE_NAMES } from "./edition.js";
+
 const MAX_AUTO_CHECK_RANGE = 181;
 const NEVER_INTERVAL = 0x7fffffff;
-
-const SITE_NAMES = ["yandex.com", "yandex.by", "yandex.kz", "yandex.ru", "yandex.com.tr", "yandex.ua"];
 
 const DEFAULT_PREFERENCE = {
 	lang: "auto",
