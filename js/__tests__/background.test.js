@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { resolveLang } from '../background.js';
 
 describe('resolveLang', () => {

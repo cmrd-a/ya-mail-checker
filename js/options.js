@@ -3,33 +3,16 @@
 //================================================================
 "use strict";
 
+import { getPreference } from "./preferences.js";
+
 const MAX_AUTO_CHECK_RANGE = 181;
 const NEVER_INTERVAL = 0x7fffffff;
 
 const SITE_NAMES = ["yandex.com", "yandex.by", "yandex.kz", "yandex.ru", "yandex.com.tr", "yandex.ua"];
 
-const DEFAULT_PREFERENCE = {
-	lang: "auto",
-	site: 3,
-	inbox: true,
-	interval: 30,
-	showToolbarNumber: true,
-	showPopup: true,
-	resetCounter: false,
-	reUseExistingMailTab: true,
-	openBehavior: 1,
-	enableNotifications: true,
-};
-
 const $ = (id) => document.getElementById(id);
 
 const msg = (key, subs) => I18N.getMessage(key, subs);
-
-// Read stored settings merged over defaults.
-async function getPreference() {
-	const { preference } = await chrome.storage.local.get("preference");
-	return { ...DEFAULT_PREFERENCE, ...(preference ?? {}) };
-}
 
 // Render the radio list of supported Yandex domains.
 function buildSiteList(selectedSite) {

@@ -1,3 +1,6 @@
+import { jest } from '@jest/globals';
+global.jest = jest;
+
 global.chrome = {
     i18n: {
         getUILanguage: jest.fn()
@@ -11,7 +14,8 @@ global.chrome = {
     alarms: {
         onAlarm: { addListener: jest.fn() },
         create: jest.fn(),
-        clearAll: jest.fn()
+        clearAll: jest.fn(),
+        get: jest.fn().mockResolvedValue(null)
     },
     action: {
         onClicked: { addListener: jest.fn() },
@@ -37,6 +41,10 @@ global.chrome = {
     offscreen: {
         createDocument: jest.fn().mockResolvedValue(),
         closeDocument: jest.fn().mockResolvedValue()
+    },
+    notifications: {
+        onClicked: { addListener: jest.fn() },
+        clear: jest.fn()
     }
 };
 
@@ -53,8 +61,3 @@ global.OffscreenCanvas = class {
 };
 
 global.fetch = jest.fn();
-global.chrome.notifications = {
-    onClicked: { addListener: jest.fn() },
-    clear: jest.fn()
-};
-global.chrome.alarms.get = jest.fn().mockResolvedValue(null);

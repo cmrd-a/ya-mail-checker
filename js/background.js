@@ -2,23 +2,12 @@
 // Yandex Mail checker - Manifest V3 service worker
 //================================================================
 import { analyzeHTML, analyzeMessagesHTML, checkEmailURL, emailURL, matchPattern } from "./edition.js";
+import { getPreference } from "./preferences.js";
 
 const ALARM_NAME = "checkMail";
 const NEVER_INTERVAL = 0x7fffffff;
 const REQUEST_TIMEOUT_MS = 50000;
 const DOUBLE_CLICK_MS = 1000;
-
-const DEFAULT_PREFERENCE = {
-	lang: "auto",
-	site: 3,
-	inbox: true,
-	interval: 30,
-	showToolbarNumber: true,
-	showPopup: true,
-	resetCounter: false,
-	reUseExistingMailTab: true,
-	openBehavior: 1,
-};
 
 const CHECKING_COLOR = [60, 120, 216, 255];
 const BADGE_COLOR = [211, 47, 47, 255];
@@ -34,20 +23,6 @@ let clickTimer = null;
 let i18nMessages = {};
 let i18nLang = null;
 let lastUnreadCount = -1;
-
-
-//================================================
-// Preferences (chrome.storage.local)
-//================================================
-// Merge stored settings over defaults; persist defaults on first run.
-async function getPreference() {
-	const { preference } = await chrome.storage.local.get("preference");
-	const merged = { ...DEFAULT_PREFERENCE, ...(preference ?? {}) };
-	if (!preference) {
-		await chrome.storage.local.set({ preference: merged });
-	}
-	return merged;
-}
 
 
 //================================================
