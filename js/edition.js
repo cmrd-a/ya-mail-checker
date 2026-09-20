@@ -146,24 +146,15 @@ export function analyzeHTML(input, inboxPref) {
 
 	// Optionally fold in unread counters of custom labels.
 	if (inboxPref) {
-		const chunks = foldersHtml.split("</a>");
-		chunks.pop(); // Remove the trailing chunk after the last </a>
+		const labelRegex = /href="([^"]+)"(?:(?!<\/a>)[\s\S])*?class="b-folders__folder__num"[^>]*>\s*([\s\S]*?)\s*<\/span>/g;
+		let labelMatch;
+		while ((labelMatch = labelRegex.exec(foldersHtml)) !== null) {
+			const href = labelMatch[1];
+			const numStr = labelMatch[2];
 
-		for (const chunk of chunks) {
-			const numMatch = chunk.match(/class="b-folders__folder__num"[^>]*>\s*([\s\S]*?)\s*<\/span>/);
-			if (numMatch) {
-				const numStr = numMatch[1].trim();
-				const hrefMatch = chunk.match(/href="([^"]+)"/);
-
-				if (hrefMatch) {
-					const href = hrefMatch[1];
-					if (href !== "/lite/inbox" && href !== "/lite/sent" && href !== "/lite/trash" && href !== "/lite/spam") {
-						if (!NUMBER_PATTERN.test(numStr)) return -1;
-						totalCount += Number(numStr.replace(/,/g, ""));
-					}
-				} else {
-					return -1;
-				}
+			if (href !== "/lite/inbox" && href !== "/lite/sent" && href !== "/lite/trash" && href !== "/lite/spam") {
+				if (!NUMBER_PATTERN.test(numStr)) return -1;
+				totalCount += Number(numStr.replace(/,/g, ""));
 			}
 		}
 	}
