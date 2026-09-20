@@ -1,11 +1,25 @@
 {
   "name": "yandex-mail-checker",
-  "version": "1.0.0",
-  "type": "module",
+  "version": "1.2.0",
+  "description": "Расширение для Chrome (Manifest V3), которое показывает счётчик непрочитанных писем Яндекс.Почты на иконке панели инструментов и позволяет быстро открыть почту.",
+  "main": "index.js",
   "scripts": {
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cmrd-a/ya-mail-checker.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/cmrd-a/ya-mail-checker/issues"
+  },
+  "homepage": "https://github.com/cmrd-a/ya-mail-checker#readme",
   "devDependencies": {
-    "jest": "^29.0.0"
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
   }
 }

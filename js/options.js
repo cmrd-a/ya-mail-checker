@@ -3,33 +3,15 @@
 //================================================================
 "use strict";
 
+import { getPreference } from "./preferences.js";
+import { siteNames as SITE_NAMES } from "./edition.js";
+
 const MAX_AUTO_CHECK_RANGE = 181;
 const NEVER_INTERVAL = 0x7fffffff;
-
-const SITE_NAMES = ["yandex.com", "yandex.by", "yandex.kz", "yandex.ru", "yandex.com.tr", "yandex.ua"];
-
-const DEFAULT_PREFERENCE = {
-	lang: "auto",
-	site: 3,
-	inbox: true,
-	interval: 30,
-	showToolbarNumber: true,
-	showPopup: true,
-	resetCounter: false,
-	reUseExistingMailTab: true,
-	openBehavior: 1,
-	enableNotifications: true,
-};
 
 const $ = (id) => document.getElementById(id);
 
 const msg = (key, subs) => I18N.getMessage(key, subs);
-
-// Read stored settings merged over defaults.
-async function getPreference() {
-	const { preference } = await chrome.storage.local.get("preference");
-	return { ...DEFAULT_PREFERENCE, ...(preference ?? {}) };
-}
 
 // Render the radio list of supported Yandex domains.
 function buildSiteList(selectedSite) {
@@ -82,6 +64,7 @@ function loadForm(prefs) {
 	$("lang").value = prefs.lang;
 	buildSiteList(prefs.site);
 	$("inbox").checked = prefs.inbox;
+	$("showOnlyUnreadInPopup").checked = prefs.showOnlyUnreadInPopup;
 	$("autoCheckRange").value = intervalToSlider(prefs.interval);
 	updateAutoCheckText();
 	$("showToolbarNumber").checked = prefs.showToolbarNumber;
@@ -96,6 +79,20 @@ function loadForm(prefs) {
 	if ($("enableNotifications")) {
 		$("enableNotifications").checked = prefs.enableNotifications;
 	}
+	$("flashIconOnNewMail").checked = prefs.flashIconOnNewMail;
+	$("notificationSound").value = prefs.notificationSound;
+	$("quietHoursEnabled").checked = prefs.quietHoursEnabled;
+	$("quietHoursStart").value = prefs.quietHoursStart;
+	$("quietHoursEnd").value = prefs.quietHoursEnd;
+	updateQuietHoursRow();
+}
+
+// Grey out the quiet-hours time range while the toggle is off.
+function updateQuietHoursRow() {
+	const enabled = $("quietHoursEnabled").checked;
+	$("quietHoursStart").disabled = !enabled;
+	$("quietHoursEnd").disabled = !enabled;
+	$("quietHoursRow").classList.toggle("disabled", !enabled);
 }
 
 // Collect a preferences object from the current form state.
@@ -112,6 +109,7 @@ function readForm() {
 		lang: $("lang").value,
 		site: selectedSite === -1 ? 0 : selectedSite,
 		inbox: $("inbox").checked,
+		showOnlyUnreadInPopup: $("showOnlyUnreadInPopup").checked,
 		interval: sliderToInterval(Number($("autoCheckRange").value)),
 		showToolbarNumber: $("showToolbarNumber").checked,
 		showPopup: $("showPopup").checked,
@@ -119,6 +117,11 @@ function readForm() {
 		reUseExistingMailTab: $("reUseExistingMailTab").checked,
 		openBehavior,
 		enableNotifications: $("enableNotifications") ? $("enableNotifications").checked : true,
+		flashIconOnNewMail: $("flashIconOnNewMail").checked,
+		notificationSound: $("notificationSound").value,
+		quietHoursEnabled: $("quietHoursEnabled").checked,
+		quietHoursStart: $("quietHoursStart").value,
+		quietHoursEnd: $("quietHoursEnd").value,
 	};
 }
 
@@ -148,5 +151,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 	applyDynamicTexts();
 
 	$("autoCheckRange").addEventListener("input", updateAutoCheckText);
+	$("quietHoursEnabled").addEventListener("change", updateQuietHoursRow);
 	$("save").addEventListener("click", saveForm);
 });

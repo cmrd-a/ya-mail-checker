@@ -2,23 +2,12 @@
 // Yandex Mail checker - Manifest V3 service worker
 //================================================================
 import { analyzeHTML, analyzeMessagesHTML, checkEmailURL, emailURL, matchPattern } from "./edition.js";
+import { getPreference } from "./preferences.js";
 
 const ALARM_NAME = "checkMail";
 const NEVER_INTERVAL = 0x7fffffff;
 const REQUEST_TIMEOUT_MS = 50000;
 const DOUBLE_CLICK_MS = 1000;
-
-const DEFAULT_PREFERENCE = {
-	lang: "auto",
-	site: 3,
-	inbox: true,
-	interval: 30,
-	showToolbarNumber: true,
-	showPopup: true,
-	resetCounter: false,
-	reUseExistingMailTab: true,
-	openBehavior: 1,
-};
 
 const CHECKING_COLOR = [60, 120, 216, 255];
 const BADGE_COLOR = [211, 47, 47, 255];
@@ -34,27 +23,15 @@ let clickTimer = null;
 let i18nMessages = {};
 let i18nLang = null;
 let lastUnreadCount = -1;
-
-
-//================================================
-// Preferences (chrome.storage.local)
-//================================================
-// Merge stored settings over defaults; persist defaults on first run.
-async function getPreference() {
-	const { preference } = await chrome.storage.local.get("preference");
-	const merged = { ...DEFAULT_PREFERENCE, ...(preference ?? {}) };
-	if (!preference) {
-		await chrome.storage.local.set({ preference: merged });
-	}
-	return merged;
-}
+let lastCheckedAt = null;
+let flashTimer = null;
 
 
 //================================================
 // Localization (locale chosen in settings)
 //================================================
 // Map the stored language ("auto"/"en"/"ru") to a concrete supported locale.
-function resolveLang(prefs) {
+export function resolveLang(prefs) {
 	let lang = prefs?.lang || "auto";
 	if (lang === "auto") {
 		const ui = (chrome.i18n.getUILanguage?.() || "en").toLowerCase();
@@ -110,6 +87,16 @@ const MONO_FILL = {
 async function loadIconSet(variant) {
 	const sources = { 19: "icons/c19.png", 38: "icons/c38.png" };
 	const fill = MONO_FILL[variant];
+
+	let rgbMask, alphaMask;
+	if (fill) {
+		const isLittleEndian = new Uint8Array(new Uint32Array([0x11223344]).buffer)[0] === 0x44;
+		rgbMask = isLittleEndian
+			? (fill[2] << 16) | (fill[1] << 8) | fill[0]
+			: (fill[0] << 24) | (fill[1] << 16) | (fill[2] << 8);
+		alphaMask = isLittleEndian ? 0xFF000000 : 0x000000FF;
+	}
+
 	const entries = await Promise.all(
 		[19, 38].map(async (size) => {
 			const response = await fetch(chrome.runtime.getURL(sources[size]));
@@ -120,11 +107,9 @@ async function loadIconSet(variant) {
 			ctx.drawImage(bitmap, 0, 0, size, size);
 			const imageData = ctx.getImageData(0, 0, size, size);
 			if (fill) {
-				const { data } = imageData;
-				for (let i = 0; i < data.length; i += 4) {
-					data[i] = fill[0];
-					data[i + 1] = fill[1];
-					data[i + 2] = fill[2];
+				const view32 = new Uint32Array(imageData.data.buffer);
+				for (let i = 0; i < view32.length; i++) {
+					view32[i] = (view32[i] & alphaMask) | rgbMask;
 				}
 			}
 			return [size, imageData];
@@ -159,6 +144,28 @@ function setDarkTheme(isDark) {
 	if (lastIconActive !== null) { setActionIcon(lastIconActive); }
 }
 
+// Briefly pulse the badge background to draw the eye to new mail, then
+// restore the normal badge color.
+const FLASH_COLOR = [255, 196, 0, 255];
+const FLASH_STEPS = 4;
+const FLASH_INTERVAL_MS = 220;
+
+function flashIcon() {
+	if (flashTimer) { clearTimeout(flashTimer); }
+	let step = 0;
+	const tick = () => {
+		chrome.action.setBadgeBackgroundColor({ color: step % 2 === 0 ? FLASH_COLOR : BADGE_COLOR });
+		step++;
+		if (step < FLASH_STEPS) {
+			flashTimer = setTimeout(tick, FLASH_INTERVAL_MS);
+		} else {
+			flashTimer = null;
+			chrome.action.setBadgeBackgroundColor({ color: BADGE_COLOR });
+		}
+	};
+	tick();
+}
+
 
 //================================================
 // Offscreen document (theme detection)
@@ -183,6 +190,17 @@ async function ensureOffscreenDocument() {
 		}
 	})();
 	return offscreenReady;
+}
+
+// Ask the offscreen page to play a synthesized notification tone
+// ("chime" / "bell"). "default" (system sound) and "none" never get here.
+async function playNotificationSound(kind) {
+	try {
+		await ensureOffscreenDocument();
+		await chrome.runtime.sendMessage({ type: "playSound", sound: kind });
+	} catch {
+		// Offscreen doc/messaging can transiently fail; not critical.
+	}
 }
 
 
@@ -261,8 +279,36 @@ async function fetchText(method, url, body) {
 	}
 }
 
-// Follow the lite-inbox request/redirect chain and parse the unread count.
-async function fetchUnreadCount(prefs, returnMessages = false) {
+// Parse a "HH:MM" preference string into minutes since midnight.
+function parseHHMM(value) {
+	const [h, m] = String(value || "0:0").split(":").map(Number);
+	return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+}
+
+// Whether "now" (local time) falls inside the configured quiet-hours window.
+// Handles overnight ranges (e.g. 23:00 -> 07:00).
+export function isQuietHours(prefs, now = new Date()) {
+	if (!prefs?.quietHoursEnabled) { return false; }
+	const start = parseHHMM(prefs.quietHoursStart);
+	const end = parseHHMM(prefs.quietHoursEnd);
+	if (start === end) { return false; }
+	const nowMin = now.getHours() * 60 + now.getMinutes();
+	return start < end ? (nowMin >= start && nowMin < end) : (nowMin >= start || nowMin < end);
+}
+
+function parseRedirect(result) {
+	const [verb, redirectURL, ...rest] = String(result).split(" ");
+	if (verb === "GET") {
+		return { method: "GET", url: redirectURL, body: null };
+	} else if (verb === "POST") {
+		return { method: "POST", url: redirectURL, body: rest.join(" ") };
+	}
+	return null;
+}
+
+// Follow the lite-inbox request/redirect chain to the final resolved page.
+// Returns { html, count } or null if the chain didn't resolve to a real page.
+async function fetchResolvedInbox(prefs) {
 	let method = "GET";
 	let url = checkEmailURL[prefs.site];
 	let body = null;
@@ -271,30 +317,70 @@ async function fetchUnreadCount(prefs, returnMessages = false) {
 		const text = await fetchText(method, url, body);
 		const result = analyzeHTML(text, prefs.inbox);
 		if (typeof result === "number" && !Number.isNaN(result)) {
-			if (returnMessages) {
-				return analyzeMessagesHTML(text);
-			}
-			return result;
+			return { html: text, count: result };
 		}
-		const [verb, redirectURL, ...rest] = String(result).split(" ");
-		if (verb === "GET") {
-			method = "GET";
-			url = redirectURL;
-			body = null;
-		} else if (verb === "POST") {
-			method = "POST";
-			url = redirectURL;
-			body = rest.join(" ");
+		const redirect = parseRedirect(result);
+		if (redirect) {
+			({ method, url, body } = redirect);
 		} else {
-			return returnMessages ? [] : -1;
+			return null;
 		}
 	}
-	return returnMessages ? [] : -1;
+	return null;
+}
+
+async function fetchUnreadCount(prefs, returnMessages = false) {
+	const resolved = await fetchResolvedInbox(prefs);
+	if (!resolved) { return returnMessages ? [] : -1; }
+	return returnMessages ? analyzeMessagesHTML(resolved.html) : resolved.count;
 }
 
 // Fetch messages for the popup
 async function getMessages(prefs) {
-	return await fetchUnreadCount(prefs, true);
+	const messages = await fetchUnreadCount(prefs, true);
+	return prefs.showOnlyUnreadInPopup ? messages.filter(m => m.isUnread) : messages;
+}
+
+
+//================================================
+// Delete a message/thread
+//================================================
+// The lite inbox's toolbar form submits to this endpoint with the row's
+// checkbox field ("ids" for a single message, "tids" for a thread), a
+// page-wide CSRF-style "_ckey" token, and the clicked button's name/value
+// (here, always the delete button). Reverse-engineered from a captured
+// real request; see js/edition.js for where actionField/actionValue come from.
+const CKEY_REGEX = /name="_ckey" value="([^"]+)"/;
+const DELETE_BUTTON_VALUE = "Удалить"; // the lite UI's own delete button text
+
+export async function deleteMessage(prefs, actionField, actionValue) {
+	if (!actionField || !actionValue) { return false; }
+
+	const resolved = await fetchResolvedInbox(prefs);
+	if (!resolved) { return false; }
+	const ckeyMatch = resolved.html.match(CKEY_REGEX);
+	if (!ckeyMatch) { return false; }
+
+	const origin = new URL(checkEmailURL[prefs.site]).origin;
+	const body = new URLSearchParams({
+		delete: DELETE_BUTTON_VALUE,
+		request: "",
+		_ckey: ckeyMatch[1],
+		_handlers: "do-messages",
+		retpath: "/inbox",
+		[actionField]: actionValue,
+	});
+
+	try {
+		// The lite UI itself doesn't return a structured success/failure signal
+		// beyond a redirect back to the inbox (which fetchText follows); a
+		// completed request without a thrown error is the best confirmation
+		// available here.
+		await fetchText("POST", `${origin}/lite/messages-action.xml`, body.toString());
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 // Run a single mail check and reflect the result on the toolbar icon.
@@ -321,15 +407,22 @@ async function checkNow(showProgress = true) {
 		} else {
 			applyState("unread", count, prefs);
 
-			if (lastUnreadCount !== -1 && count > lastUnreadCount && prefs.enableNotifications) {
-				// Show notification for new emails
-				chrome.notifications.create({
-					type: "basic",
-					iconUrl: chrome.runtime.getURL("icons/c128.png"),
-					title: t("email") || "Yandex Mail",
-					message: t("statusUnread", [String(count)]),
-					silent: false // Try to play system notification sound
-				});
+			if (lastUnreadCount !== -1 && count > lastUnreadCount) {
+				const quiet = isQuietHours(prefs);
+				if (prefs.flashIconOnNewMail && !quiet) { flashIcon(); }
+				if (prefs.enableNotifications && !quiet) {
+					const useSystemSound = prefs.notificationSound === "default";
+					chrome.notifications.create({
+						type: "basic",
+						iconUrl: chrome.runtime.getURL("icons/c128.png"),
+						title: t("email") || "Yandex Mail",
+						message: t("statusUnread", [String(count)]),
+						silent: !useSystemSound // "default" plays the system sound; other choices are played ourselves (or muted)
+					});
+					if (!useSystemSound && prefs.notificationSound !== "none") {
+						playNotificationSound(prefs.notificationSound);
+					}
+				}
 			}
 		}
 
@@ -340,6 +433,7 @@ async function checkNow(showProgress = true) {
 		const timedOut = error === "timeout" || error?.name === "AbortError";
 		applyState(timedOut ? "timeout" : "disconnected", 0, prefs);
 	} finally {
+		lastCheckedAt = Date.now();
 		checking = false;
 	}
 }
@@ -474,12 +568,23 @@ chrome.action.onClicked.addListener(() => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 	if (message?.type === "getMessages") {
-		getPreference().then(prefs => getMessages(prefs)).then(sendResponse).catch(() => sendResponse([]));
+		const respond = (messages) => sendResponse({ messages, lastCheckedAt, unreadCount: lastUnreadCount });
+		getPreference().then(prefs => getMessages(prefs)).then(respond).catch(() => respond([]));
 		return true; // Keep the messaging channel open for sendResponse
 	}
 	if (message?.type === "themeChanged") {
 		setDarkTheme(!!message.dark);
 		return false;
+	}
+	if (message?.type === "deleteMessage") {
+		getPreference()
+			.then(prefs => deleteMessage(prefs, message.actionField, message.actionValue))
+			.then(ok => {
+				sendResponse({ ok });
+				if (ok) { checkNow(false); }
+			})
+			.catch(() => sendResponse({ ok: false }));
+		return true; // Keep the messaging channel open for sendResponse
 	}
 	switch (message?.type) {
 		case "openMail":
@@ -501,3 +606,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // Run once when the service worker is first loaded.
 initialize();
+export { fetchText, REQUEST_TIMEOUT_MS };

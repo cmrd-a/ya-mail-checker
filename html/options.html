@@ -5,7 +5,7 @@
 		<title data-i18n="optionsTitle">Options</title>
 		<link type="text/css" rel="stylesheet" href="../css/options.css" />
 		<script src="../js/i18n.js" defer></script>
-		<script src="../js/options.js" defer></script>
+		<script type="module" src="../js/options.js" defer></script>
 	</head>
 	<body>
 		<div class="page">
@@ -36,9 +36,39 @@
 						<span data-i18n="inboxOnly">Count only unread emails in Inbox</span>
 					</label>
 					<label class="field">
+						<input type="checkbox" id="showOnlyUnreadInPopup" />
+						<span data-i18n="showOnlyUnreadInPopupOpt">Show only unread emails in the popup list</span>
+					</label>
+				</section>
+
+				<section class="card">
+					<h2 data-i18n="notificationsLegend">Notifications</h2>
+					<label class="field">
 						<input type="checkbox" id="enableNotifications" />
 						<span data-i18n="enableNotifications">Show desktop notification for new emails</span>
 					</label>
+					<label class="field">
+						<input type="checkbox" id="flashIconOnNewMail" />
+						<span data-i18n="flashIcon">Flash the toolbar icon when new mail arrives</span>
+					</label>
+					<div class="field-block">
+						<label class="field-label" for="notificationSound" data-i18n="notificationSoundLabel">Notification sound</label>
+						<select id="notificationSound" class="select">
+							<option value="default" data-i18n="soundDefault">Default (system)</option>
+							<option value="chime" data-i18n="soundChime">Chime</option>
+							<option value="bell" data-i18n="soundBell">Bell</option>
+							<option value="none" data-i18n="soundNone">None</option>
+						</select>
+					</div>
+					<label class="field">
+						<input type="checkbox" id="quietHoursEnabled" />
+						<span data-i18n="quietHoursEnabledOpt">Quiet hours (no sound or notification)</span>
+					</label>
+					<div class="range-row" id="quietHoursRow">
+						<input type="time" id="quietHoursStart" class="time-input" />
+						<span class="range-edge" data-i18n="quietHoursTo">to</span>
+						<input type="time" id="quietHoursEnd" class="time-input" />
+					</div>
 				</section>
 
 				<section class="card">
