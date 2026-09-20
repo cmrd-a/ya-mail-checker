@@ -52,7 +52,7 @@ describe('analyzeMessagesHTML', () => {
         });
     });
 
-    it('cleans up HTML tags and entities in subject and snippet', () => {
+    it('cleans up entities in subject and snippet', () => {
         const html = `
             <div class="b-messages">
                 <div class="b-message ">
@@ -70,8 +70,8 @@ describe('analyzeMessagesHTML', () => {
             isUnread: false,
             href: '/lite/message/11111',
             sender: 'Sender 3',
-            subject: 'Subject with spaces and bold',
-            snippet: 'Snippet with entities and italics',
+            subject: 'Subject with spaces and <b>bold</b>',
+            snippet: 'Snippet with entities and <i>italics</i>',
         });
     });
 

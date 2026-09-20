@@ -46,7 +46,6 @@ const SNIPPET_REGEX_1 = /class="[^"]*b-message__firstline[^"]*"[^>]*>([\s\S]*?)<
 const SNIPPET_REGEX_2 = /class="[^"]*b-messages__message__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/;
 const SNIPPET_REGEX_3 = /class="[^"]*b-messages__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/;
 const NBSP_REGEX = /&nbsp;/g;
-const HTML_TAG_REGEX = /<[^>]+>/g;
 
 // Returns: -3 not connected, -2 logged out, -1 unknown response, 0+ unread count.
 // The scraping logic is intentionally kept close to the original to preserve
@@ -89,13 +88,13 @@ export function analyzeMessagesHTML(input) {
 		const subjectMatch = block.match(SUBJECT_REGEX_1) ||
 		                     block.match(SUBJECT_REGEX_2) ||
 		                     block.match(SUBJECT_REGEX_3);
-		if (subjectMatch) subject = subjectMatch[1].trim().replace(NBSP_REGEX, ' ').replace(HTML_TAG_REGEX, '');
+		if (subjectMatch) subject = subjectMatch[1].trim().replace(NBSP_REGEX, ' ');
 
 		let snippet = '';
 		const snippetMatch = block.match(SNIPPET_REGEX_1) ||
 		                     block.match(SNIPPET_REGEX_2) ||
 		                     block.match(SNIPPET_REGEX_3);
-		if (snippetMatch) snippet = snippetMatch[1].trim().replace(NBSP_REGEX, ' ').replace(HTML_TAG_REGEX, '');
+		if (snippetMatch) snippet = snippetMatch[1].trim().replace(NBSP_REGEX, ' ');
 
 		if (href) {
 			messages.push({
