@@ -1,167 +1,308 @@
 import { jest } from '@jest/globals';
 
-global.chrome = {};
-
-// Specifically mock things that background.js expects at the top level
-global.chrome.action = {
-    onClicked: { addListener: jest.fn() },
+// Setup chrome mock
+const chromeMock = {
+  action: {
     setTitle: jest.fn(),
-    setBadgeText: jest.fn(),
     setBadgeBackgroundColor: jest.fn(),
+    setBadgeText: jest.fn(),
     setIcon: jest.fn(),
-    setPopup: jest.fn()
-};
-global.chrome.alarms = {
-    onAlarm: { addListener: jest.fn() },
+    setPopup: jest.fn(),
+    onClicked: { addListener: jest.fn() }
+  },
+  alarms: {
+    clear: jest.fn().mockResolvedValue(),
+    create: jest.fn(),
+    get: jest.fn().mockResolvedValue(null),
+    onAlarm: { addListener: jest.fn() }
+  },
+  i18n: {
+    getUILanguage: jest.fn().mockReturnValue("en")
+  },
+  notifications: {
     create: jest.fn(),
     clear: jest.fn(),
-    get: jest.fn().mockResolvedValue(null)
-};
-global.chrome.storage = {
-    local: {
-        get: jest.fn().mockResolvedValue({}),
-        set: jest.fn().mockResolvedValue()
-    }
-};
-global.chrome.runtime = {
-    onMessage: { addListener: jest.fn() },
-    getURL: jest.fn().mockReturnValue('chrome-extension://id/'),
+    onClicked: { addListener: jest.fn() }
+  },
+  runtime: {
+    getURL: jest.fn((path) => `chrome-extension://mock-id/${path}`),
     onInstalled: { addListener: jest.fn() },
     onStartup: { addListener: jest.fn() },
-};
-
-global.chrome.contextMenus = {
-    create: jest.fn(),
-    removeAll: jest.fn(),
-    onClicked: { addListener: jest.fn() }
-};
-
-global.chrome.offscreen = {
-    hasDocument: jest.fn().mockResolvedValue(false),
-    createDocument: jest.fn().mockResolvedValue(),
-    closeDocument: jest.fn().mockResolvedValue()
-};
-
-global.chrome.i18n = {
-    getUILanguage: jest.fn()
-};
-
-global.chrome.notifications = {
-    onClicked: { addListener: jest.fn() },
-    create: jest.fn(),
-    clear: jest.fn()
-};
-
-global.chrome.tabs = {
-    create: jest.fn(),
+    onMessage: { addListener: jest.fn() },
+    getManifest: jest.fn(() => ({ version: "1.0.0" }))
+  },
+  storage: {
+    local: {
+      get: jest.fn().mockResolvedValue({ preference: {} }),
+      set: jest.fn().mockResolvedValue()
+    }
+  },
+  tabs: {
     query: jest.fn().mockResolvedValue([]),
-    update: jest.fn()
+    update: jest.fn().mockResolvedValue({ windowId: 1 }),
+    create: jest.fn().mockResolvedValue({ id: 2 })
+  },
+  windows: {
+    update: jest.fn().mockResolvedValue()
+  },
+  offscreen: {
+    createDocument: jest.fn().mockResolvedValue(),
+    hasDocument: jest.fn().mockResolvedValue(false),
+    closeDocument: jest.fn().mockResolvedValue()
+  }
 };
 
-global.chrome.windows = {
-    update: jest.fn()
+global.chrome = chromeMock;
+global.fetch = jest.fn().mockResolvedValue({
+  json: jest.fn().mockResolvedValue({
+    statusUnread: { message: "Unread" },
+    statusDisconnected: { message: "Disconnected" }
+  }),
+  text: jest.fn().mockResolvedValue("mock html")
+});
+global.OffscreenCanvas = class OffscreenCanvas {
+  constructor() {}
+  getContext() {
+    return {
+      drawImage: jest.fn(),
+      getImageData: jest.fn(() => ({ data: [] })),
+      clearRect: jest.fn()
+    };
+  }
 };
 
-// Let jest use fake timers
-jest.useFakeTimers();
+global.matchMedia = jest.fn().mockReturnValue({ matches: false, addEventListener: jest.fn(), removeEventListener: jest.fn() });
 
-// Import background.js
-const bg = await import('./background.js');
+// We'll capture listeners to trigger them later
+let onMessageListener;
+let onAlarmListener;
+let onInstalledListener;
+let editionMock;
+let bg;
+
+beforeAll(async () => {
+  // Capture listeners
+  chromeMock.runtime.onMessage.addListener.mockImplementation((listener) => {
+    onMessageListener = listener;
+  });
+  chromeMock.alarms.onAlarm.addListener.mockImplementation((listener) => {
+    onAlarmListener = listener;
+  });
+  chromeMock.runtime.onInstalled.addListener.mockImplementation((listener) => {
+    onInstalledListener = listener;
+  });
+
+  // Mock edition.js before importing background.js
+  jest.unstable_mockModule('./edition.js', () => ({
+    analyzeHTML: jest.fn(),
+    analyzeMessagesHTML: jest.fn(),
+    checkEmailURL: ['http://mock.test'],
+    emailURL: ['http://mock.test'],
+    matchPattern: ['*://mock.test/*'],
+    siteNames: ['mock.test']
+  }));
+
+  editionMock = await import('./edition.js');
+  bg = await import('./background.js');
+
+  // Wait for the initialize() triggered on load to complete
+  await new Promise((resolve) => setTimeout(resolve, 50));
+});
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  global.fetch.mockResolvedValue({
+    json: jest.fn().mockResolvedValue({}),
+    text: jest.fn().mockResolvedValue("mock html")
+  });
+});
 
 describe('fetchText', () => {
-    let fetchMock;
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
 
-    beforeEach(() => {
-        fetchMock = jest.fn();
-        global.fetch = fetchMock;
-        jest.clearAllMocks();
-    });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
 
-    it('should abort and throw when fetch response exceeds REQUEST_TIMEOUT_MS', async () => {
-        // Setup a fetch mock that will take longer than REQUEST_TIMEOUT_MS to resolve,
-        // and throws if the abort signal is triggered.
-        fetchMock.mockImplementation((url, options) => {
-            return new Promise((resolve, reject) => {
-                const onAbort = () => {
-                    reject(new Error(options.signal.reason || 'AbortError'));
-                };
-
-                if (options.signal.aborted) {
-                    return onAbort();
-                }
-
-                options.signal.addEventListener('abort', onAbort);
-            });
-        });
-
-        // Start fetchText
-        const fetchTextPromise = bg.fetchText('GET', 'http://example.com');
-
-        // Fast forward time by exactly the timeout
-        jest.advanceTimersByTime(bg.REQUEST_TIMEOUT_MS);
-
-        // Await the promise to verify it rejects
-        await expect(fetchTextPromise).rejects.toThrow('timeout');
-
-        expect(fetchMock).toHaveBeenCalledTimes(1);
-    });
-
-    it('should clear the timeout if fetch succeeds before REQUEST_TIMEOUT_MS', async () => {
-        const mockResponse = {
-            text: jest.fn().mockResolvedValue('success text')
+  it('should abort and throw when fetch response exceeds REQUEST_TIMEOUT_MS', async () => {
+    // Setup a fetch mock that will take longer than REQUEST_TIMEOUT_MS to resolve,
+    // and throws if the abort signal is triggered.
+    global.fetch.mockImplementation((url, options) => {
+      return new Promise((resolve, reject) => {
+        const onAbort = () => {
+          reject(new Error(options.signal.reason || 'AbortError'));
         };
-        fetchMock.mockResolvedValue(mockResponse);
 
-        const fetchTextPromise = bg.fetchText('GET', 'http://example.com');
+        if (options.signal.aborted) {
+          return onAbort();
+        }
 
-        // Await resolution immediately
-        const result = await fetchTextPromise;
-        expect(result).toBe('success text');
-
-        // Ensure no timeouts are left pending
-        expect(jest.getTimerCount()).toBe(0);
+        options.signal.addEventListener('abort', onAbort);
+      });
     });
+
+    // Start fetchText
+    const fetchTextPromise = bg.fetchText('GET', 'http://example.com');
+
+    // Fast forward time by exactly the timeout
+    jest.advanceTimersByTime(bg.REQUEST_TIMEOUT_MS);
+
+    // Await the promise to verify it rejects
+    await expect(fetchTextPromise).rejects.toThrow('timeout');
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('should clear the timeout if fetch succeeds before REQUEST_TIMEOUT_MS', async () => {
+    const mockResponse = {
+      text: jest.fn().mockResolvedValue('success text')
+    };
+    global.fetch.mockResolvedValue(mockResponse);
+
+    const fetchTextPromise = bg.fetchText('GET', 'http://example.com');
+
+    // Await resolution immediately
+    const result = await fetchTextPromise;
+    expect(result).toBe('success text');
+
+    // Ensure no timeouts are left pending
+    expect(jest.getTimerCount()).toBe(0);
+  });
 });
 
 describe('resolveLang', () => {
-    beforeEach(() => {
-        global.chrome.i18n.getUILanguage = jest.fn();
+  beforeEach(() => {
+    chromeMock.i18n.getUILanguage = jest.fn();
+  });
+
+  it('returns "en" when lang is "en"', () => {
+    expect(bg.resolveLang({ lang: 'en' })).toBe('en');
+  });
+
+  it('returns "ru" when lang is "ru"', () => {
+    expect(bg.resolveLang({ lang: 'ru' })).toBe('ru');
+  });
+
+  it('falls back to "en" for unsupported languages', () => {
+    expect(bg.resolveLang({ lang: 'fr' })).toBe('en');
+  });
+
+  it('defaults to "auto" and resolves to "en" when chrome.i18n is not ru', () => {
+    chromeMock.i18n.getUILanguage.mockReturnValue('en-US');
+    expect(bg.resolveLang({})).toBe('en');
+  });
+
+  it('defaults to "auto" and resolves to "ru" when chrome.i18n starts with ru', () => {
+    chromeMock.i18n.getUILanguage.mockReturnValue('ru-RU');
+    expect(bg.resolveLang({})).toBe('ru');
+  });
+
+  it('defaults to "auto" and resolves to "ru" when chrome.i18n is ru', () => {
+    chromeMock.i18n.getUILanguage.mockReturnValue('ru');
+    expect(bg.resolveLang({ lang: 'auto' })).toBe('ru');
+  });
+
+  it('handles missing chrome.i18n.getUILanguage method gracefully', () => {
+    chromeMock.i18n.getUILanguage = undefined;
+    expect(bg.resolveLang({ lang: 'auto' })).toBe('en');
+  });
+
+  it('handles null preferences', () => {
+    chromeMock.i18n.getUILanguage.mockReturnValue('ru-RU');
+    expect(bg.resolveLang(null)).toBe('ru');
+  });
+});
+
+describe('background.js', () => {
+  test('setup mock env', () => {
+    expect(chrome.action.setTitle).toBeDefined();
+  });
+
+  test('initialize sets up alarm and action', async () => {
+    // initialize is triggered by onInstalled or onStartup manually for testing
+    if (onInstalledListener) {
+      await onInstalledListener();
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(chrome.storage.local.get).toHaveBeenCalledWith("preference");
+    expect(chrome.action.setPopup).toHaveBeenCalled();
+    expect(chrome.alarms.get).toHaveBeenCalledWith("checkMail");
+  });
+
+  test('checkNow success sets unread state', async () => {
+    chrome.storage.local.get.mockResolvedValue({ preference: { site: 0, showToolbarNumber: true, enableNotifications: false } });
+    editionMock.analyzeHTML.mockReturnValue(5); // 5 unread messages
+
+    global.fetch.mockResolvedValue({
+      json: jest.fn().mockResolvedValue({}),
+      text: jest.fn().mockResolvedValue("mock html")
     });
 
-    it('returns "en" when lang is "en"', () => {
-        expect(bg.resolveLang({ lang: 'en' })).toBe('en');
+    // Trigger checkNow via message
+    if (onMessageListener) {
+      onMessageListener({ type: "checkNow" }, {}, jest.fn());
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(chrome.action.setBadgeBackgroundColor).toHaveBeenCalled();
+    expect(chrome.action.setBadgeText).toHaveBeenCalledWith({ text: "5" });
+  });
+
+  test('checkNow disconnected state', async () => {
+    chrome.storage.local.get.mockResolvedValue({ preference: { site: 0 } });
+    editionMock.analyzeHTML.mockReturnValue(-3); // disconnected
+
+    global.fetch.mockResolvedValue({
+      json: jest.fn().mockResolvedValue({}),
+      text: jest.fn().mockResolvedValue("mock html")
     });
 
-    it('returns "ru" when lang is "ru"', () => {
-        expect(bg.resolveLang({ lang: 'ru' })).toBe('ru');
+    if (onMessageListener) {
+      onMessageListener({ type: "checkNow" }, {}, jest.fn());
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(chrome.action.setBadgeText).toHaveBeenCalledWith({ text: "" });
+  });
+
+  test('openMail creates new tab', async () => {
+    chrome.storage.local.get.mockResolvedValue({ preference: { site: 0, openBehavior: 1, resetCounter: false } });
+    chrome.tabs.query.mockResolvedValue([]); // No matching tabs
+
+    if (onMessageListener) {
+      onMessageListener({ type: "openMail" }, {}, jest.fn());
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(chrome.tabs.create).toHaveBeenCalledWith(expect.objectContaining({ url: 'http://mock.test', active: true }));
+  });
+
+  test('fetchUnreadCount correctly loops and parses result', async () => {
+    chrome.storage.local.get.mockResolvedValue({ preference: { site: 0, showToolbarNumber: true, enableNotifications: false } });
+
+    // Test the logic of following redirects
+    editionMock.analyzeHTML
+      .mockReturnValueOnce("GET http://mock.test/redirect")
+      .mockReturnValueOnce(2);
+
+    global.fetch.mockResolvedValue({
+      json: jest.fn().mockResolvedValue({}),
+      text: jest.fn().mockResolvedValue("mock html")
     });
 
-    it('falls back to "en" for unsupported languages', () => {
-        expect(bg.resolveLang({ lang: 'fr' })).toBe('en');
-    });
+    if (onMessageListener) {
+      onMessageListener({ type: "checkNow" }, {}, jest.fn());
+    }
 
-    it('defaults to "auto" and resolves to "en" when chrome.i18n is not ru', () => {
-        global.chrome.i18n.getUILanguage.mockReturnValue('en-US');
-        expect(bg.resolveLang({})).toBe('en');
-    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
-    it('defaults to "auto" and resolves to "ru" when chrome.i18n starts with ru', () => {
-        global.chrome.i18n.getUILanguage.mockReturnValue('ru-RU');
-        expect(bg.resolveLang({})).toBe('ru');
-    });
-
-    it('defaults to "auto" and resolves to "ru" when chrome.i18n is ru', () => {
-        global.chrome.i18n.getUILanguage.mockReturnValue('ru');
-        expect(bg.resolveLang({ lang: 'auto' })).toBe('ru');
-    });
-
-    it('handles missing chrome.i18n.getUILanguage method gracefully', () => {
-        global.chrome.i18n.getUILanguage = undefined;
-        expect(bg.resolveLang({ lang: 'auto' })).toBe('en');
-    });
-
-    it('handles null preferences', () => {
-        global.chrome.i18n.getUILanguage.mockReturnValue('ru-RU');
-        expect(bg.resolveLang(null)).toBe('ru');
-    });
+    expect(global.fetch.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(chrome.action.setBadgeText).toHaveBeenCalledWith({ text: "2" });
+  });
 });
