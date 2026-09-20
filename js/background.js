@@ -2,23 +2,12 @@
 // Yandex Mail checker - Manifest V3 service worker
 //================================================================
 import { analyzeHTML, analyzeMessagesHTML, checkEmailURL, emailURL, matchPattern } from "./edition.js";
+import { getPreference } from "./preferences.js";
 
 const ALARM_NAME = "checkMail";
 const NEVER_INTERVAL = 0x7fffffff;
 const REQUEST_TIMEOUT_MS = 50000;
 const DOUBLE_CLICK_MS = 1000;
-
-const DEFAULT_PREFERENCE = {
-	lang: "auto",
-	site: 3,
-	inbox: true,
-	interval: 30,
-	showToolbarNumber: true,
-	showPopup: true,
-	resetCounter: false,
-	reUseExistingMailTab: true,
-	openBehavior: 1,
-};
 
 const CHECKING_COLOR = [60, 120, 216, 255];
 const BADGE_COLOR = [211, 47, 47, 255];
@@ -34,20 +23,6 @@ let clickTimer = null;
 let i18nMessages = {};
 let i18nLang = null;
 let lastUnreadCount = -1;
-
-
-//================================================
-// Preferences (chrome.storage.local)
-//================================================
-// Merge stored settings over defaults; persist defaults on first run.
-async function getPreference() {
-	const { preference } = await chrome.storage.local.get("preference");
-	const merged = { ...DEFAULT_PREFERENCE, ...(preference ?? {}) };
-	if (!preference) {
-		await chrome.storage.local.set({ preference: merged });
-	}
-	return merged;
-}
 
 
 //================================================
@@ -110,6 +85,16 @@ const MONO_FILL = {
 async function loadIconSet(variant) {
 	const sources = { 19: "icons/c19.png", 38: "icons/c38.png" };
 	const fill = MONO_FILL[variant];
+
+	let rgbMask, alphaMask;
+	if (fill) {
+		const isLittleEndian = new Uint8Array(new Uint32Array([0x11223344]).buffer)[0] === 0x44;
+		rgbMask = isLittleEndian
+			? (fill[2] << 16) | (fill[1] << 8) | fill[0]
+			: (fill[0] << 24) | (fill[1] << 16) | (fill[2] << 8);
+		alphaMask = isLittleEndian ? 0xFF000000 : 0x000000FF;
+	}
+
 	const entries = await Promise.all(
 		[19, 38].map(async (size) => {
 			const response = await fetch(chrome.runtime.getURL(sources[size]));
@@ -120,11 +105,9 @@ async function loadIconSet(variant) {
 			ctx.drawImage(bitmap, 0, 0, size, size);
 			const imageData = ctx.getImageData(0, 0, size, size);
 			if (fill) {
-				const { data } = imageData;
-				for (let i = 0; i < data.length; i += 4) {
-					data[i] = fill[0];
-					data[i + 1] = fill[1];
-					data[i + 2] = fill[2];
+				const view32 = new Uint32Array(imageData.data.buffer);
+				for (let i = 0; i < view32.length; i++) {
+					view32[i] = (view32[i] & alphaMask) | rgbMask;
 				}
 			}
 			return [size, imageData];
@@ -261,6 +244,16 @@ async function fetchText(method, url, body) {
 	}
 }
 
+function parseRedirect(result) {
+	const [verb, redirectURL, ...rest] = String(result).split(" ");
+	if (verb === "GET") {
+		return { method: "GET", url: redirectURL, body: null };
+	} else if (verb === "POST") {
+		return { method: "POST", url: redirectURL, body: rest.join(" ") };
+	}
+	return null;
+}
+
 // Follow the lite-inbox request/redirect chain and parse the unread count.
 async function fetchUnreadCount(prefs, returnMessages = false) {
 	let method = "GET";
@@ -271,20 +264,11 @@ async function fetchUnreadCount(prefs, returnMessages = false) {
 		const text = await fetchText(method, url, body);
 		const result = analyzeHTML(text, prefs.inbox);
 		if (typeof result === "number" && !Number.isNaN(result)) {
-			if (returnMessages) {
-				return analyzeMessagesHTML(text);
-			}
-			return result;
+			return returnMessages ? analyzeMessagesHTML(text) : result;
 		}
-		const [verb, redirectURL, ...rest] = String(result).split(" ");
-		if (verb === "GET") {
-			method = "GET";
-			url = redirectURL;
-			body = null;
-		} else if (verb === "POST") {
-			method = "POST";
-			url = redirectURL;
-			body = rest.join(" ");
+		const redirect = parseRedirect(result);
+		if (redirect) {
+			({ method, url, body } = redirect);
 		} else {
 			return returnMessages ? [] : -1;
 		}
