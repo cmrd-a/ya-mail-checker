@@ -74,13 +74,13 @@ export function analyzeMessagesHTML(input) {
 		const subjectMatch = block.match(/class="[^"]*b-message__subject__text[^"]*"[^>]*>([\s\S]*?)<\/span>/) || 
 		                     block.match(/class="[^"]*b-messages__message__subject[^"]*"[^>]*>([\s\S]*?)<\/span>/) ||
 		                     block.match(/class="[^"]*b-messages__subject[^"]*"[^>]*>(?:<span[^>]*>)?([\s\S]*?)<\/span>/);
-		if (subjectMatch) subject = subjectMatch[1].trim().replace(/&nbsp;/g, ' ').replace(/<[^>]+>/g, '');
+		if (subjectMatch) subject = subjectMatch[1].trim().replace(/&nbsp;/g, ' ');
 
 		let snippet = '';
 		const snippetMatch = block.match(/class="[^"]*b-message__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/) || 
 		                     block.match(/class="[^"]*b-messages__message__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/) ||
 		                     block.match(/class="[^"]*b-messages__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/);
-		if (snippetMatch) snippet = snippetMatch[1].trim().replace(/&nbsp;/g, ' ').replace(/<[^>]+>/g, '');
+		if (snippetMatch) snippet = snippetMatch[1].trim().replace(/&nbsp;/g, ' ');
 
 		if (href) {
 			messages.push({
