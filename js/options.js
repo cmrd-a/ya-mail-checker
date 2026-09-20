@@ -78,6 +78,20 @@ function loadForm(prefs) {
 	if ($("enableNotifications")) {
 		$("enableNotifications").checked = prefs.enableNotifications;
 	}
+	$("flashIconOnNewMail").checked = prefs.flashIconOnNewMail;
+	$("notificationSound").value = prefs.notificationSound;
+	$("quietHoursEnabled").checked = prefs.quietHoursEnabled;
+	$("quietHoursStart").value = prefs.quietHoursStart;
+	$("quietHoursEnd").value = prefs.quietHoursEnd;
+	updateQuietHoursRow();
+}
+
+// Grey out the quiet-hours time range while the toggle is off.
+function updateQuietHoursRow() {
+	const enabled = $("quietHoursEnabled").checked;
+	$("quietHoursStart").disabled = !enabled;
+	$("quietHoursEnd").disabled = !enabled;
+	$("quietHoursRow").classList.toggle("disabled", !enabled);
 }
 
 // Collect a preferences object from the current form state.
@@ -101,6 +115,11 @@ function readForm() {
 		reUseExistingMailTab: $("reUseExistingMailTab").checked,
 		openBehavior,
 		enableNotifications: $("enableNotifications") ? $("enableNotifications").checked : true,
+		flashIconOnNewMail: $("flashIconOnNewMail").checked,
+		notificationSound: $("notificationSound").value,
+		quietHoursEnabled: $("quietHoursEnabled").checked,
+		quietHoursStart: $("quietHoursStart").value,
+		quietHoursEnd: $("quietHoursEnd").value,
 	};
 }
 
@@ -130,5 +149,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 	applyDynamicTexts();
 
 	$("autoCheckRange").addEventListener("input", updateAutoCheckText);
+	$("quietHoursEnabled").addEventListener("change", updateQuietHoursRow);
 	$("save").addEventListener("click", saveForm);
 });

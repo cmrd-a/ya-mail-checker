@@ -215,6 +215,30 @@ describe('resolveLang', () => {
   });
 });
 
+describe('isQuietHours', () => {
+  it('returns false when quiet hours are disabled', () => {
+    expect(bg.isQuietHours({ quietHoursEnabled: false, quietHoursStart: '23:00', quietHoursEnd: '07:00' }, new Date(2024, 0, 1, 2, 0))).toBe(false);
+  });
+
+  it('returns false when start equals end', () => {
+    expect(bg.isQuietHours({ quietHoursEnabled: true, quietHoursStart: '10:00', quietHoursEnd: '10:00' }, new Date(2024, 0, 1, 10, 0))).toBe(false);
+  });
+
+  it('handles a same-day range', () => {
+    const prefs = { quietHoursEnabled: true, quietHoursStart: '09:00', quietHoursEnd: '17:00' };
+    expect(bg.isQuietHours(prefs, new Date(2024, 0, 1, 12, 0))).toBe(true);
+    expect(bg.isQuietHours(prefs, new Date(2024, 0, 1, 8, 59))).toBe(false);
+    expect(bg.isQuietHours(prefs, new Date(2024, 0, 1, 20, 0))).toBe(false);
+  });
+
+  it('handles an overnight range', () => {
+    const prefs = { quietHoursEnabled: true, quietHoursStart: '23:00', quietHoursEnd: '07:00' };
+    expect(bg.isQuietHours(prefs, new Date(2024, 0, 1, 0, 30))).toBe(true);
+    expect(bg.isQuietHours(prefs, new Date(2024, 0, 1, 23, 30))).toBe(true);
+    expect(bg.isQuietHours(prefs, new Date(2024, 0, 1, 12, 0))).toBe(false);
+  });
+});
+
 describe('background.js', () => {
   test('setup mock env', () => {
     expect(chrome.action.setTitle).toBeDefined();

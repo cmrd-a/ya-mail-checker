@@ -9,6 +9,11 @@ export const DEFAULT_PREFERENCE = {
 	reUseExistingMailTab: true,
 	openBehavior: 1,
 	enableNotifications: true,
+	notificationSound: "default",
+	flashIconOnNewMail: true,
+	quietHoursEnabled: false,
+	quietHoursStart: "23:00",
+	quietHoursEnd: "07:00",
 };
 
 export async function getPreference() {

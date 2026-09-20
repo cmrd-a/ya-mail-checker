@@ -23,6 +23,8 @@ let clickTimer = null;
 let i18nMessages = {};
 let i18nLang = null;
 let lastUnreadCount = -1;
+let lastCheckedAt = null;
+let flashTimer = null;
 
 
 //================================================
@@ -142,6 +144,28 @@ function setDarkTheme(isDark) {
 	if (lastIconActive !== null) { setActionIcon(lastIconActive); }
 }
 
+// Briefly pulse the badge background to draw the eye to new mail, then
+// restore the normal badge color.
+const FLASH_COLOR = [255, 196, 0, 255];
+const FLASH_STEPS = 4;
+const FLASH_INTERVAL_MS = 220;
+
+function flashIcon() {
+	if (flashTimer) { clearTimeout(flashTimer); }
+	let step = 0;
+	const tick = () => {
+		chrome.action.setBadgeBackgroundColor({ color: step % 2 === 0 ? FLASH_COLOR : BADGE_COLOR });
+		step++;
+		if (step < FLASH_STEPS) {
+			flashTimer = setTimeout(tick, FLASH_INTERVAL_MS);
+		} else {
+			flashTimer = null;
+			chrome.action.setBadgeBackgroundColor({ color: BADGE_COLOR });
+		}
+	};
+	tick();
+}
+
 
 //================================================
 // Offscreen document (theme detection)
@@ -166,6 +190,17 @@ async function ensureOffscreenDocument() {
 		}
 	})();
 	return offscreenReady;
+}
+
+// Ask the offscreen page to play a synthesized notification tone
+// ("chime" / "bell"). "default" (system sound) and "none" never get here.
+async function playNotificationSound(kind) {
+	try {
+		await ensureOffscreenDocument();
+		await chrome.runtime.sendMessage({ type: "playSound", sound: kind });
+	} catch {
+		// Offscreen doc/messaging can transiently fail; not critical.
+	}
 }
 
 
@@ -244,6 +279,23 @@ async function fetchText(method, url, body) {
 	}
 }
 
+// Parse a "HH:MM" preference string into minutes since midnight.
+function parseHHMM(value) {
+	const [h, m] = String(value || "0:0").split(":").map(Number);
+	return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+}
+
+// Whether "now" (local time) falls inside the configured quiet-hours window.
+// Handles overnight ranges (e.g. 23:00 -> 07:00).
+export function isQuietHours(prefs, now = new Date()) {
+	if (!prefs?.quietHoursEnabled) { return false; }
+	const start = parseHHMM(prefs.quietHoursStart);
+	const end = parseHHMM(prefs.quietHoursEnd);
+	if (start === end) { return false; }
+	const nowMin = now.getHours() * 60 + now.getMinutes();
+	return start < end ? (nowMin >= start && nowMin < end) : (nowMin >= start || nowMin < end);
+}
+
 function parseRedirect(result) {
 	const [verb, redirectURL, ...rest] = String(result).split(" ");
 	if (verb === "GET") {
@@ -305,15 +357,22 @@ async function checkNow(showProgress = true) {
 		} else {
 			applyState("unread", count, prefs);
 
-			if (lastUnreadCount !== -1 && count > lastUnreadCount && prefs.enableNotifications) {
-				// Show notification for new emails
-				chrome.notifications.create({
-					type: "basic",
-					iconUrl: chrome.runtime.getURL("icons/c128.png"),
-					title: t("email") || "Yandex Mail",
-					message: t("statusUnread", [String(count)]),
-					silent: false // Try to play system notification sound
-				});
+			if (lastUnreadCount !== -1 && count > lastUnreadCount) {
+				const quiet = isQuietHours(prefs);
+				if (prefs.flashIconOnNewMail && !quiet) { flashIcon(); }
+				if (prefs.enableNotifications && !quiet) {
+					const useSystemSound = prefs.notificationSound === "default";
+					chrome.notifications.create({
+						type: "basic",
+						iconUrl: chrome.runtime.getURL("icons/c128.png"),
+						title: t("email") || "Yandex Mail",
+						message: t("statusUnread", [String(count)]),
+						silent: !useSystemSound // "default" plays the system sound; other choices are played ourselves (or muted)
+					});
+					if (!useSystemSound && prefs.notificationSound !== "none") {
+						playNotificationSound(prefs.notificationSound);
+					}
+				}
 			}
 		}
 
@@ -324,6 +383,7 @@ async function checkNow(showProgress = true) {
 		const timedOut = error === "timeout" || error?.name === "AbortError";
 		applyState(timedOut ? "timeout" : "disconnected", 0, prefs);
 	} finally {
+		lastCheckedAt = Date.now();
 		checking = false;
 	}
 }
@@ -458,7 +518,8 @@ chrome.action.onClicked.addListener(() => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 	if (message?.type === "getMessages") {
-		getPreference().then(prefs => getMessages(prefs)).then(sendResponse).catch(() => sendResponse([]));
+		const respond = (messages) => sendResponse({ messages, lastCheckedAt, unreadCount: lastUnreadCount });
+		getPreference().then(prefs => getMessages(prefs)).then(respond).catch(() => respond([]));
 		return true; // Keep the messaging channel open for sendResponse
 	}
 	if (message?.type === "themeChanged") {

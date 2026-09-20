@@ -112,6 +112,35 @@ body {
 	border-color: var(--accent);
 }
 
+.field-block {
+	padding: 7px 0;
+}
+
+.field-label {
+	display: block;
+	margin-bottom: 6px;
+	font-size: 13px;
+	color: var(--text);
+}
+
+.time-input {
+	padding: 7px 10px;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	background: var(--bg);
+	color: var(--text);
+	font: inherit;
+}
+
+.time-input:focus {
+	outline: none;
+	border-color: var(--accent);
+}
+
+.range-row.disabled {
+	opacity: 0.5;
+}
+
 .site-list {
 	display: flex;
 	flex-direction: column;

@@ -16,6 +16,15 @@
    "openMail": { "message": "Open mail" },
 
    "enableNotifications": { "message": "Show desktop notification for new emails" },
+   "notificationsLegend": { "message": "Notifications" },
+   "flashIcon": { "message": "Flash the toolbar icon when new mail arrives" },
+   "notificationSoundLabel": { "message": "Notification sound" },
+   "soundDefault": { "message": "Default (system)" },
+   "soundChime": { "message": "Chime" },
+   "soundBell": { "message": "Bell" },
+   "soundNone": { "message": "None" },
+   "quietHoursEnabledOpt": { "message": "Quiet hours (no sound or notification)" },
+   "quietHoursTo": { "message": "to" },
    "optionsTitle": { "message": "Options" },
    "langLegend": { "message": "Language" },
    "langAuto": { "message": "Automatic (browser)" },
@@ -53,6 +62,20 @@
    "statusDisconnected": { "message": "Not connected" },
    "statusTimeout": { "message": "Request timeout" },
    "statusUnknown": { "message": "Unrecognized response" },
+
+   "lastChecked": {
+      "message": "Checked $TIME$",
+      "placeholders": { "time": { "content": "$1" } }
+   },
+   "justNow": { "message": "just now" },
+   "minutesAgo": {
+      "message": "$N$m ago",
+      "placeholders": { "n": { "content": "$1" } }
+   },
+   "hoursAgo": {
+      "message": "$N$h ago",
+      "placeholders": { "n": { "content": "$1" } }
+   },
 
    "aboutTitle": { "message": "About" },
    "versionLabel": {
