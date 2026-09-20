@@ -46,10 +46,46 @@ export function analyzeMessagesHTML(input) {
 	let output = input.substr(index);
 
 	const messageBlocks = [];
-	const regex = /<div[^>]*class="[^"]*(?:b-messages__message|b-message )[^"]*"[^>]*>([\s\S]*?)<\/div>(?=\s*(?:<div[^>]*class="[^"]*(?:b-messages__message|b-message )|<\/div>))/g;
-	let match;
-	while ((match = regex.exec(output)) !== null) {
-		messageBlocks.push(match[0]);
+	let currentPos = 0;
+	while (true) {
+		let divStart = output.indexOf('<div', currentPos);
+		if (divStart === -1) break;
+
+		let tagEnd = output.indexOf('>', divStart);
+		if (tagEnd === -1) break;
+
+		let divTag = output.substring(divStart, tagEnd + 1);
+
+		if (divTag.includes('class="') && (divTag.includes('b-messages__message') || divTag.includes('b-message '))) {
+			let depth = 1;
+			let innerPos = tagEnd + 1;
+
+			while (depth > 0 && innerPos < output.length) {
+				let nextDiv = output.indexOf('<div', innerPos);
+				let nextClose = output.indexOf('</div', innerPos);
+
+				if (nextClose === -1) break;
+
+				if (nextDiv !== -1 && nextDiv < nextClose) {
+					depth++;
+					innerPos = nextDiv + 4;
+				} else {
+					depth--;
+					innerPos = nextClose + 6;
+				}
+			}
+
+			if (depth === 0) {
+				messageBlocks.push(output.substring(divStart, innerPos));
+				currentPos = innerPos;
+				continue;
+			} else {
+				messageBlocks.push(output.substring(divStart));
+				break;
+			}
+		}
+
+		currentPos = divStart + 4;
 	}
 
 	for (const block of messageBlocks) {
