@@ -236,6 +236,16 @@ async function fetchText(method, url, body) {
 	}
 }
 
+function parseRedirect(result) {
+	const [verb, redirectURL, ...rest] = String(result).split(" ");
+	if (verb === "GET") {
+		return { method: "GET", url: redirectURL, body: null };
+	} else if (verb === "POST") {
+		return { method: "POST", url: redirectURL, body: rest.join(" ") };
+	}
+	return null;
+}
+
 // Follow the lite-inbox request/redirect chain and parse the unread count.
 async function fetchUnreadCount(prefs, returnMessages = false) {
 	let method = "GET";
@@ -246,20 +256,11 @@ async function fetchUnreadCount(prefs, returnMessages = false) {
 		const text = await fetchText(method, url, body);
 		const result = analyzeHTML(text, prefs.inbox);
 		if (typeof result === "number" && !Number.isNaN(result)) {
-			if (returnMessages) {
-				return analyzeMessagesHTML(text);
-			}
-			return result;
+			return returnMessages ? analyzeMessagesHTML(text) : result;
 		}
-		const [verb, redirectURL, ...rest] = String(result).split(" ");
-		if (verb === "GET") {
-			method = "GET";
-			url = redirectURL;
-			body = null;
-		} else if (verb === "POST") {
-			method = "POST";
-			url = redirectURL;
-			body = rest.join(" ");
+		const redirect = parseRedirect(result);
+		if (redirect) {
+			({ method, url, body } = redirect);
 		} else {
 			return returnMessages ? [] : -1;
 		}
