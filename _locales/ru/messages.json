@@ -14,6 +14,7 @@
    "optionsBtn": { "message": "Настройки..." },
    "checkNow": { "message": "Проверить сейчас" },
    "openMail": { "message": "Открыть почту" },
+   "deleteMail": { "message": "Удалить" },
 
    "enableNotifications": { "message": "Показывать уведомление о новых письмах" },
    "notificationsLegend": { "message": "Уведомления" },
@@ -31,6 +32,7 @@
    "siteLegend": { "message": "Почтовый сайт" },
    "checkingLegend": { "message": "Проверка почты" },
    "inboxOnly": { "message": "Считать непрочитанные только во «Входящих»" },
+   "showOnlyUnreadInPopupOpt": { "message": "Показывать в попапе только непрочитанные письма" },
    "autoCheckLegend": { "message": "Автопроверка" },
    "often": { "message": "Часто" },
    "never": { "message": "Никогда" },

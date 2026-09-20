@@ -8,6 +8,7 @@ export const DEFAULT_PREFERENCE = {
 	resetCounter: false,
 	reUseExistingMailTab: true,
 	openBehavior: 1,
+	showOnlyUnreadInPopup: true,
 	enableNotifications: true,
 	notificationSound: "default",
 	flashIconOnNewMail: true,

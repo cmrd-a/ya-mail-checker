@@ -14,6 +14,7 @@
    "optionsBtn": { "message": "Options..." },
    "checkNow": { "message": "Check now" },
    "openMail": { "message": "Open mail" },
+   "deleteMail": { "message": "Delete" },
 
    "enableNotifications": { "message": "Show desktop notification for new emails" },
    "notificationsLegend": { "message": "Notifications" },
@@ -31,6 +32,7 @@
    "siteLegend": { "message": "Email Site" },
    "checkingLegend": { "message": "Email Checking" },
    "inboxOnly": { "message": "Count only unread emails in Inbox" },
+   "showOnlyUnreadInPopupOpt": { "message": "Show only unread emails in the popup list" },
    "autoCheckLegend": { "message": "Auto-check" },
    "often": { "message": "Often" },
    "never": { "message": "Never" },

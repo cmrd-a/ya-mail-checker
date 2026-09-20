@@ -34,6 +34,10 @@ export const siteNames = ["yandex.com", "yandex.by", "yandex.kz", "yandex.ru", "
 const NUMBER_PATTERN = /^\d{1,3}(,\d\d\d)*$|^\d+$/;
 
 const HREF_REGEX = /href="(\/lite\/(?:message|thread)\/[^"]+)"/;
+// Single messages expose a "ids" checkbox (value = message id); threads expose
+// a "tids" checkbox instead (value = "<threadId>:<messageCount>"). Whichever
+// is present is what messages-action.xml expects for that row.
+const ACTION_CHECKBOX_REGEX = /<input type="checkbox" name="(ids|tids)" class="b-form-checkbox" value="([^"]+)"/;
 const SENDER_TITLE_REGEX = /class="[^"]*b-message__from[^"]*"[^>]*title="([^"]+)"/;
 const SENDER_TEXT_REGEX_1 = /class="[^"]*b-message__from__text[^"]*"[^>]*>([^<]+)<\/span>/;
 const SENDER_TEXT_REGEX_2 = /class="[^"]*b-messages__message__sender[^"]*"[^>]*>([^<]+)<\/span>/;
@@ -131,13 +135,23 @@ export function analyzeMessagesHTML(input) {
 		                     block.match(SNIPPET_REGEX_3);
 		if (snippetMatch) snippet = snippetMatch[1].trim().replace(NBSP_REGEX, ' ');
 
+		let actionField = null;
+		let actionValue = null;
+		const actionMatch = block.match(ACTION_CHECKBOX_REGEX);
+		if (actionMatch) {
+			actionField = actionMatch[1];
+			actionValue = actionMatch[2];
+		}
+
 		if (href) {
 			messages.push({
 				isUnread,
 				href,
 				sender,
 				subject,
-				snippet
+				snippet,
+				actionField,
+				actionValue
 			});
 		}
 	}

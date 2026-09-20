@@ -64,6 +64,7 @@ function loadForm(prefs) {
 	$("lang").value = prefs.lang;
 	buildSiteList(prefs.site);
 	$("inbox").checked = prefs.inbox;
+	$("showOnlyUnreadInPopup").checked = prefs.showOnlyUnreadInPopup;
 	$("autoCheckRange").value = intervalToSlider(prefs.interval);
 	updateAutoCheckText();
 	$("showToolbarNumber").checked = prefs.showToolbarNumber;
@@ -108,6 +109,7 @@ function readForm() {
 		lang: $("lang").value,
 		site: selectedSite === -1 ? 0 : selectedSite,
 		inbox: $("inbox").checked,
+		showOnlyUnreadInPopup: $("showOnlyUnreadInPopup").checked,
 		interval: sliderToInterval(Number($("autoCheckRange").value)),
 		showToolbarNumber: $("showToolbarNumber").checked,
 		showPopup: $("showPopup").checked,

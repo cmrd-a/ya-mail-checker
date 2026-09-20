@@ -239,6 +239,65 @@ describe('isQuietHours', () => {
   });
 });
 
+describe('deleteMessage', () => {
+  const prefs = { site: 0, inbox: false };
+
+  it('returns false when actionField/actionValue are missing', async () => {
+    const ok = await bg.deleteMessage(prefs, null, null);
+    expect(ok).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('returns false when the inbox request chain never resolves', async () => {
+    editionMock.analyzeHTML.mockReturnValue('not a number or redirect');
+    global.fetch.mockResolvedValue({ text: jest.fn().mockResolvedValue('mock html') });
+
+    const ok = await bg.deleteMessage(prefs, 'ids', '12345');
+    expect(ok).toBe(false);
+  });
+
+  it('returns false when the resolved page has no _ckey token', async () => {
+    editionMock.analyzeHTML.mockReturnValue(3);
+    global.fetch.mockResolvedValue({ text: jest.fn().mockResolvedValue('<html>no token here</html>') });
+
+    const ok = await bg.deleteMessage(prefs, 'ids', '12345');
+    expect(ok).toBe(false);
+  });
+
+  it('posts the delete action with the scraped _ckey and the given field/value', async () => {
+    editionMock.analyzeHTML.mockReturnValue(3);
+    global.fetch.mockResolvedValue({
+      text: jest.fn().mockResolvedValue('<input type="hidden" name="_ckey" value="tok123">'),
+    });
+
+    const ok = await bg.deleteMessage(prefs, 'ids', '194217733930374143');
+    expect(ok).toBe(true);
+
+    const postCall = global.fetch.mock.calls.find(([, options]) => options?.method === 'POST');
+    expect(postCall).toBeDefined();
+    const [url, options] = postCall;
+    expect(url).toBe('http://mock.test/lite/messages-action.xml');
+    const body = new URLSearchParams(options.body);
+    expect(body.get('_ckey')).toBe('tok123');
+    expect(body.get('ids')).toBe('194217733930374143');
+    expect(body.get('_handlers')).toBe('do-messages');
+  });
+
+  it('supports the thread field ("tids") the same way', async () => {
+    editionMock.analyzeHTML.mockReturnValue(3);
+    global.fetch.mockResolvedValue({
+      text: jest.fn().mockResolvedValue('<input type="hidden" name="_ckey" value="tok456">'),
+    });
+
+    const ok = await bg.deleteMessage(prefs, 'tids', '191684459139976958:9');
+    expect(ok).toBe(true);
+
+    const postCall = global.fetch.mock.calls.find(([, options]) => options?.method === 'POST');
+    const body = new URLSearchParams(postCall[1].body);
+    expect(body.get('tids')).toBe('191684459139976958:9');
+  });
+});
+
 describe('background.js', () => {
   test('setup mock env', () => {
     expect(chrome.action.setTitle).toBeDefined();

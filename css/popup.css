@@ -208,6 +208,51 @@ body {
 	min-width: 0;
 }
 
+.email-delete-btn {
+	flex: none;
+	align-self: center;
+	width: 26px;
+	height: 26px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 4px;
+	color: var(--muted);
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity 0.12s, background 0.12s, color 0.12s;
+}
+
+.email-delete-btn svg {
+	width: 15px;
+	height: 15px;
+}
+
+.email-item:hover .email-delete-btn {
+	opacity: 1;
+}
+
+.email-delete-btn:hover {
+	background: var(--hover);
+	color: var(--accent);
+}
+
+.email-delete-btn.busy {
+	opacity: 0.5;
+	pointer-events: none;
+}
+
+.email-delete-btn.error {
+	opacity: 1;
+	color: var(--accent);
+	animation: email-delete-shake 0.3s ease;
+}
+
+@keyframes email-delete-shake {
+	25% { transform: translateX(-2px); }
+	75% { transform: translateX(2px); }
+}
+
 .email-sender {
 	font-size: 13px;
 	color: var(--text);

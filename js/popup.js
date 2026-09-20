@@ -6,6 +6,32 @@
 const AVATAR_COLORS = ["#ec3a2f", "#2f7dec", "#2fbf71", "#b23fec", "#d98c00", "#0fb5c9", "#ec3f8e", "#6b7f99"];
 const LAST_CHECKED_REFRESH_MS = 30000;
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+const TRASH_PATHS = [
+	"M3 6h18",
+	"M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6",
+	"M10 11v6",
+	"M14 11v6",
+	"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2",
+];
+
+// Build a small stroke-style icon matching the header buttons.
+function buildIcon(paths) {
+	const svg = document.createElementNS(SVG_NS, "svg");
+	svg.setAttribute("viewBox", "0 0 24 24");
+	svg.setAttribute("fill", "none");
+	svg.setAttribute("stroke", "currentColor");
+	svg.setAttribute("stroke-width", "2");
+	svg.setAttribute("stroke-linecap", "round");
+	svg.setAttribute("stroke-linejoin", "round");
+	for (const d of paths) {
+		const path = document.createElementNS(SVG_NS, "path");
+		path.setAttribute("d", d);
+		svg.appendChild(path);
+	}
+	return svg;
+}
+
 // Small deterministic hash so the same sender always gets the same color.
 function hashCode(str) {
 	let h = 0;
@@ -72,13 +98,24 @@ document.addEventListener("DOMContentLoaded", async () => {
 		const list = document.getElementById("messageList");
 		list.innerHTML = "";
 
-		if (!messages || messages.length === 0) {
+		const renderEmptyState = () => {
 			const div = document.createElement("div");
 			div.className = "no-messages";
 			div.textContent = I18N.getMessage("statusEmpty") || "No unread messages";
 			list.appendChild(div);
+		};
+
+		if (!messages || messages.length === 0) {
+			renderEmptyState();
 			return;
 		}
+
+		// Decrement the header count pill after a successful delete of an
+		// unread message; clear it once it would hit zero.
+		const decrementHeaderCount = () => {
+			const current = Number(headerCount.textContent) || 0;
+			headerCount.textContent = current > 1 ? String(current - 1) : "";
+		};
 
 		messages.forEach(msg => {
 			const item = document.createElement("div");
@@ -107,6 +144,36 @@ document.addEventListener("DOMContentLoaded", async () => {
 			texts.appendChild(snippet);
 
 			header.appendChild(texts);
+
+			if (msg.actionField && msg.actionValue) {
+				const deleteBtn = document.createElement("div");
+				deleteBtn.className = "email-delete-btn";
+				deleteBtn.title = I18N.getMessage("deleteMail") || "Delete";
+				deleteBtn.setAttribute("aria-label", I18N.getMessage("deleteMail") || "Delete");
+				deleteBtn.appendChild(buildIcon(TRASH_PATHS));
+
+				deleteBtn.addEventListener("click", (event) => {
+					event.stopPropagation();
+					deleteBtn.classList.add("busy");
+					chrome.runtime.sendMessage(
+						{ type: "deleteMessage", actionField: msg.actionField, actionValue: msg.actionValue },
+						(response) => {
+							if (response && response.ok) {
+								item.remove();
+								if (msg.isUnread) { decrementHeaderCount(); }
+								if (!list.children.length) { renderEmptyState(); }
+							} else {
+								deleteBtn.classList.remove("busy");
+								deleteBtn.classList.add("error");
+								setTimeout(() => deleteBtn.classList.remove("error"), 1500);
+							}
+						}
+					);
+				});
+
+				header.appendChild(deleteBtn);
+			}
+
 			item.appendChild(header);
 
 			item.addEventListener("click", () => {

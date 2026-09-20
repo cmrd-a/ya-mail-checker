@@ -26,6 +26,8 @@ describe('analyzeMessagesHTML', () => {
             sender: 'Sender 1',
             subject: 'Subject 1',
             snippet: 'Snippet 1',
+            actionField: null,
+            actionValue: null,
         });
     });
 
@@ -49,6 +51,8 @@ describe('analyzeMessagesHTML', () => {
             sender: 'Sender 2',
             subject: 'Subject 2',
             snippet: 'Snippet 2',
+            actionField: null,
+            actionValue: null,
         });
     });
 
@@ -72,6 +76,8 @@ describe('analyzeMessagesHTML', () => {
             sender: 'Sender 3',
             subject: 'Subject with spaces and <b>bold</b>',
             snippet: 'Snippet with entities and <i>italics</i>',
+            actionField: null,
+            actionValue: null,
         });
     });
 
@@ -110,6 +116,8 @@ describe('analyzeMessagesHTML', () => {
             sender: 'Alt Sender',
             subject: 'Alt Subject',
             snippet: 'Alt Snippet',
+            actionField: null,
+            actionValue: null,
         });
 
         expect(result[1]).toEqual({
@@ -118,6 +126,8 @@ describe('analyzeMessagesHTML', () => {
             sender: 'Yet Another Sender',
             subject: 'Yet Another Subject',
             snippet: 'Yet Another Snippet',
+            actionField: null,
+            actionValue: null,
         });
 
         expect(result[2]).toEqual({
@@ -126,7 +136,47 @@ describe('analyzeMessagesHTML', () => {
             sender: 'Thread Sender',
             subject: 'Thread Subject',
             snippet: 'Thread Snippet',
+            actionField: null,
+            actionValue: null,
         });
+    });
+
+    it('extracts the delete-action checkbox for a single message ("ids")', () => {
+        const html = `
+            <div class="b-messages">
+                <div class="b-messages__message">
+                    <label class="b-messages__message__checkbox"><input type="checkbox" name="ids" class="b-form-checkbox" value="194217733930374143" aria-label="..."></label>
+                    <a href="/lite/message/194217733930374143">
+                        <span class="b-messages__message__sender">Solo Sender</span>
+                        <span class="b-messages__message__subject">Solo Subject</span>
+                        <span class="b-messages__message__firstline">Solo Snippet</span>
+                    </a>
+                </div>
+            </div>
+        `;
+        const result = analyzeMessagesHTML(html);
+        expect(result).toHaveLength(1);
+        expect(result[0].actionField).toBe('ids');
+        expect(result[0].actionValue).toBe('194217733930374143');
+    });
+
+    it('extracts the delete-action checkbox for a thread ("tids")', () => {
+        const html = `
+            <div class="b-messages">
+                <div class="b-messages__message b-messages__message_thread">
+                    <label class="b-messages__message__checkbox"><input type="checkbox" name="tids" class="b-form-checkbox" value="191684459139976958:9" aria-label="..."></label>
+                    <a href="/lite/thread/191684459139976958">
+                        <span class="b-messages__message__sender">Thread Sender</span>
+                        <span class="b-messages__message__subject">Thread Subject</span>
+                        <span class="b-messages__message__firstline">Thread Snippet</span>
+                    </a>
+                </div>
+            </div>
+        `;
+        const result = analyzeMessagesHTML(html);
+        expect(result).toHaveLength(1);
+        expect(result[0].actionField).toBe('tids');
+        expect(result[0].actionValue).toBe('191684459139976958:9');
     });
 
     it('ignores messages without a valid href', () => {

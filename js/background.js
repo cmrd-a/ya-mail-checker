@@ -306,8 +306,9 @@ function parseRedirect(result) {
 	return null;
 }
 
-// Follow the lite-inbox request/redirect chain and parse the unread count.
-async function fetchUnreadCount(prefs, returnMessages = false) {
+// Follow the lite-inbox request/redirect chain to the final resolved page.
+// Returns { html, count } or null if the chain didn't resolve to a real page.
+async function fetchResolvedInbox(prefs) {
 	let method = "GET";
 	let url = checkEmailURL[prefs.site];
 	let body = null;
@@ -316,21 +317,70 @@ async function fetchUnreadCount(prefs, returnMessages = false) {
 		const text = await fetchText(method, url, body);
 		const result = analyzeHTML(text, prefs.inbox);
 		if (typeof result === "number" && !Number.isNaN(result)) {
-			return returnMessages ? analyzeMessagesHTML(text) : result;
+			return { html: text, count: result };
 		}
 		const redirect = parseRedirect(result);
 		if (redirect) {
 			({ method, url, body } = redirect);
 		} else {
-			return returnMessages ? [] : -1;
+			return null;
 		}
 	}
-	return returnMessages ? [] : -1;
+	return null;
+}
+
+async function fetchUnreadCount(prefs, returnMessages = false) {
+	const resolved = await fetchResolvedInbox(prefs);
+	if (!resolved) { return returnMessages ? [] : -1; }
+	return returnMessages ? analyzeMessagesHTML(resolved.html) : resolved.count;
 }
 
 // Fetch messages for the popup
 async function getMessages(prefs) {
-	return await fetchUnreadCount(prefs, true);
+	const messages = await fetchUnreadCount(prefs, true);
+	return prefs.showOnlyUnreadInPopup ? messages.filter(m => m.isUnread) : messages;
+}
+
+
+//================================================
+// Delete a message/thread
+//================================================
+// The lite inbox's toolbar form submits to this endpoint with the row's
+// checkbox field ("ids" for a single message, "tids" for a thread), a
+// page-wide CSRF-style "_ckey" token, and the clicked button's name/value
+// (here, always the delete button). Reverse-engineered from a captured
+// real request; see js/edition.js for where actionField/actionValue come from.
+const CKEY_REGEX = /name="_ckey" value="([^"]+)"/;
+const DELETE_BUTTON_VALUE = "Удалить"; // the lite UI's own delete button text
+
+export async function deleteMessage(prefs, actionField, actionValue) {
+	if (!actionField || !actionValue) { return false; }
+
+	const resolved = await fetchResolvedInbox(prefs);
+	if (!resolved) { return false; }
+	const ckeyMatch = resolved.html.match(CKEY_REGEX);
+	if (!ckeyMatch) { return false; }
+
+	const origin = new URL(checkEmailURL[prefs.site]).origin;
+	const body = new URLSearchParams({
+		delete: DELETE_BUTTON_VALUE,
+		request: "",
+		_ckey: ckeyMatch[1],
+		_handlers: "do-messages",
+		retpath: "/inbox",
+		[actionField]: actionValue,
+	});
+
+	try {
+		// The lite UI itself doesn't return a structured success/failure signal
+		// beyond a redirect back to the inbox (which fetchText follows); a
+		// completed request without a thrown error is the best confirmation
+		// available here.
+		await fetchText("POST", `${origin}/lite/messages-action.xml`, body.toString());
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 // Run a single mail check and reflect the result on the toolbar icon.
@@ -525,6 +575,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 	if (message?.type === "themeChanged") {
 		setDarkTheme(!!message.dark);
 		return false;
+	}
+	if (message?.type === "deleteMessage") {
+		getPreference()
+			.then(prefs => deleteMessage(prefs, message.actionField, message.actionValue))
+			.then(ok => {
+				sendResponse({ ok });
+				if (ok) { checkNow(false); }
+			})
+			.catch(() => sendResponse({ ok: false }));
+		return true; // Keep the messaging channel open for sendResponse
 	}
 	switch (message?.type) {
 		case "openMail":
