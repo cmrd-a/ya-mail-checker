@@ -501,3 +501,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // Run once when the service worker is first loaded.
 initialize();
+export { fetchText, REQUEST_TIMEOUT_MS };
