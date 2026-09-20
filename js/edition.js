@@ -46,7 +46,14 @@ export function analyzeMessagesHTML(input) {
 	let output = input.substr(index);
 
 	const messageBlocks = [];
-	const regex = /<div[^>]*class="[^"]*(?:b-messages__message|b-message )[^"]*"[^>]*>([\s\S]*?)<\/div>(?=\s*(?:<div[^>]*class="[^"]*(?:b-messages__message|b-message )|<\/div>))/g;
+
+	const MSG_CLASS = 'b-messages__message|b-message ';
+	const DIV_START = `<div[^>]*class="[^"]*(?:${MSG_CLASS})[^"]*"[^>]*>`;
+	const CONTENT = '([\\s\\S]*?)';
+	const DIV_END = '<\\/div>';
+	const NEXT_MSG_OR_END = `(?=\\s*(?:<div[^>]*class="[^"]*(?:${MSG_CLASS})|<\\/div>))`;
+	const regex = new RegExp(DIV_START + CONTENT + DIV_END + NEXT_MSG_OR_END, 'g');
+
 	let match;
 	while ((match = regex.exec(output)) !== null) {
 		messageBlocks.push(match[0]);
