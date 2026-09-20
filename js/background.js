@@ -110,6 +110,16 @@ const MONO_FILL = {
 async function loadIconSet(variant) {
 	const sources = { 19: "icons/c19.png", 38: "icons/c38.png" };
 	const fill = MONO_FILL[variant];
+
+	let rgbMask, alphaMask;
+	if (fill) {
+		const isLittleEndian = new Uint8Array(new Uint32Array([0x11223344]).buffer)[0] === 0x44;
+		rgbMask = isLittleEndian
+			? (fill[2] << 16) | (fill[1] << 8) | fill[0]
+			: (fill[0] << 24) | (fill[1] << 16) | (fill[2] << 8);
+		alphaMask = isLittleEndian ? 0xFF000000 : 0x000000FF;
+	}
+
 	const entries = await Promise.all(
 		[19, 38].map(async (size) => {
 			const response = await fetch(chrome.runtime.getURL(sources[size]));
@@ -120,11 +130,9 @@ async function loadIconSet(variant) {
 			ctx.drawImage(bitmap, 0, 0, size, size);
 			const imageData = ctx.getImageData(0, 0, size, size);
 			if (fill) {
-				const { data } = imageData;
-				for (let i = 0; i < data.length; i += 4) {
-					data[i] = fill[0];
-					data[i + 1] = fill[1];
-					data[i + 2] = fill[2];
+				const view32 = new Uint32Array(imageData.data.buffer);
+				for (let i = 0; i < view32.length; i++) {
+					view32[i] = (view32[i] & alphaMask) | rgbMask;
 				}
 			}
 			return [size, imageData];
