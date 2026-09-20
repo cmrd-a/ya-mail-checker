@@ -16,6 +16,15 @@
    "openMail": { "message": "Открыть почту" },
 
    "enableNotifications": { "message": "Показывать уведомление о новых письмах" },
+   "notificationsLegend": { "message": "Уведомления" },
+   "flashIcon": { "message": "Мигать иконкой при новых письмах" },
+   "notificationSoundLabel": { "message": "Звук уведомления" },
+   "soundDefault": { "message": "Системный (по умолчанию)" },
+   "soundChime": { "message": "Перезвон" },
+   "soundBell": { "message": "Колокольчик" },
+   "soundNone": { "message": "Без звука" },
+   "quietHoursEnabledOpt": { "message": "Тихие часы (без звука и уведомлений)" },
+   "quietHoursTo": { "message": "до" },
    "optionsTitle": { "message": "Настройки" },
    "langLegend": { "message": "Язык" },
    "langAuto": { "message": "Автоматически (браузер)" },
@@ -53,6 +62,20 @@
    "statusDisconnected": { "message": "Нет соединения" },
    "statusTimeout": { "message": "Превышено время ожидания" },
    "statusUnknown": { "message": "Нераспознанный ответ" },
+
+   "lastChecked": {
+      "message": "Проверено $TIME$",
+      "placeholders": { "time": { "content": "$1" } }
+   },
+   "justNow": { "message": "только что" },
+   "minutesAgo": {
+      "message": "$N$ мин назад",
+      "placeholders": { "n": { "content": "$1" } }
+   },
+   "hoursAgo": {
+      "message": "$N$ ч назад",
+      "placeholders": { "n": { "content": "$1" } }
+   },
 
    "aboutTitle": { "message": "О расширении" },
    "versionLabel": {
