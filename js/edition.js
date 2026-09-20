@@ -33,6 +33,21 @@ export const siteNames = ["yandex.com", "yandex.by", "yandex.kz", "yandex.ru", "
 
 const NUMBER_PATTERN = /^\d{1,3}(,\d\d\d)*$|^\d+$/;
 
+const MESSAGE_BLOCK_REGEX = /<div[^>]*class="[^"]*(?:b-messages__message|b-message )[^"]*"[^>]*>([\s\S]*?)<\/div>(?=\s*(?:<div[^>]*class="[^"]*(?:b-messages__message|b-message )|<\/div>))/g;
+const HREF_REGEX = /href="(\/lite\/(?:message|thread)\/[^"]+)"/;
+const SENDER_TITLE_REGEX = /class="[^"]*b-message__from[^"]*"[^>]*title="([^"]+)"/;
+const SENDER_TEXT_REGEX_1 = /class="[^"]*b-message__from__text[^"]*"[^>]*>([^<]+)<\/span>/;
+const SENDER_TEXT_REGEX_2 = /class="[^"]*b-messages__message__sender[^"]*"[^>]*>([^<]+)<\/span>/;
+const SENDER_TEXT_REGEX_3 = /class="[^"]*b-messages__from__text[^"]*"[^>]*>(?:<span[^>]*>)?([^<]+)<\/span>/;
+const SUBJECT_REGEX_1 = /class="[^"]*b-message__subject__text[^"]*"[^>]*>([\s\S]*?)<\/span>/;
+const SUBJECT_REGEX_2 = /class="[^"]*b-messages__message__subject[^"]*"[^>]*>([\s\S]*?)<\/span>/;
+const SUBJECT_REGEX_3 = /class="[^"]*b-messages__subject[^"]*"[^>]*>(?:<span[^>]*>)?([\s\S]*?)<\/span>/;
+const SNIPPET_REGEX_1 = /class="[^"]*b-message__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/;
+const SNIPPET_REGEX_2 = /class="[^"]*b-messages__message__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/;
+const SNIPPET_REGEX_3 = /class="[^"]*b-messages__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/;
+const NBSP_REGEX = /&nbsp;/g;
+const HTML_TAG_REGEX = /<[^>]+>/g;
+
 // Returns: -3 not connected, -2 logged out, -1 unknown response, 0+ unread count.
 // The scraping logic is intentionally kept close to the original to preserve
 // the exact parsing behavior against Yandex lite markup. inboxPref mirrors the
@@ -46,9 +61,9 @@ export function analyzeMessagesHTML(input) {
 	let output = input.substr(index);
 
 	const messageBlocks = [];
-	const regex = /<div[^>]*class="[^"]*(?:b-messages__message|b-message )[^"]*"[^>]*>([\s\S]*?)<\/div>(?=\s*(?:<div[^>]*class="[^"]*(?:b-messages__message|b-message )|<\/div>))/g;
+	MESSAGE_BLOCK_REGEX.lastIndex = 0;
 	let match;
-	while ((match = regex.exec(output)) !== null) {
+	while ((match = MESSAGE_BLOCK_REGEX.exec(output)) !== null) {
 		messageBlocks.push(match[0]);
 	}
 
@@ -56,31 +71,31 @@ export function analyzeMessagesHTML(input) {
 		const isUnread = block.includes('b-message_unread') || block.includes('b-messages__message_unread');
 
 		let href = '';
-		const hrefMatch = block.match(/href="(\/lite\/(?:message|thread)\/[^"]+)"/);
+		const hrefMatch = block.match(HREF_REGEX);
 		if (hrefMatch) href = hrefMatch[1];
 
 		let sender = '';
-		const senderTitleMatch = block.match(/class="[^"]*b-message__from[^"]*"[^>]*title="([^"]+)"/);
+		const senderTitleMatch = block.match(SENDER_TITLE_REGEX);
 		if (senderTitleMatch) {
 			sender = senderTitleMatch[1];
 		} else {
-			const senderMatch = block.match(/class="[^"]*b-message__from__text[^"]*"[^>]*>([^<]+)<\/span>/) || 
-			                    block.match(/class="[^"]*b-messages__message__sender[^"]*"[^>]*>([^<]+)<\/span>/) ||
-			                    block.match(/class="[^"]*b-messages__from__text[^"]*"[^>]*>(?:<span[^>]*>)?([^<]+)<\/span>/);
+			const senderMatch = block.match(SENDER_TEXT_REGEX_1) ||
+			                    block.match(SENDER_TEXT_REGEX_2) ||
+			                    block.match(SENDER_TEXT_REGEX_3);
 			if (senderMatch) sender = senderMatch[1].trim();
 		}
 
 		let subject = '';
-		const subjectMatch = block.match(/class="[^"]*b-message__subject__text[^"]*"[^>]*>([\s\S]*?)<\/span>/) || 
-		                     block.match(/class="[^"]*b-messages__message__subject[^"]*"[^>]*>([\s\S]*?)<\/span>/) ||
-		                     block.match(/class="[^"]*b-messages__subject[^"]*"[^>]*>(?:<span[^>]*>)?([\s\S]*?)<\/span>/);
-		if (subjectMatch) subject = subjectMatch[1].trim().replace(/&nbsp;/g, ' ');
+		const subjectMatch = block.match(SUBJECT_REGEX_1) ||
+		                     block.match(SUBJECT_REGEX_2) ||
+		                     block.match(SUBJECT_REGEX_3);
+		if (subjectMatch) subject = subjectMatch[1].trim().replace(NBSP_REGEX, ' ');
 
 		let snippet = '';
-		const snippetMatch = block.match(/class="[^"]*b-message__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/) || 
-		                     block.match(/class="[^"]*b-messages__message__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/) ||
-		                     block.match(/class="[^"]*b-messages__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/);
-		if (snippetMatch) snippet = snippetMatch[1].trim().replace(/&nbsp;/g, ' ');
+		const snippetMatch = block.match(SNIPPET_REGEX_1) ||
+		                     block.match(SNIPPET_REGEX_2) ||
+		                     block.match(SNIPPET_REGEX_3);
+		if (snippetMatch) snippet = snippetMatch[1].trim().replace(NBSP_REGEX, ' ');
 
 		if (href) {
 			messages.push({
