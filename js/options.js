@@ -3,23 +3,11 @@
 //================================================================
 "use strict";
 
+import { siteNames as SITE_NAMES } from "./edition.js";
+import { DEFAULT_PREFERENCE } from "./constants.js";
+
 const MAX_AUTO_CHECK_RANGE = 181;
 const NEVER_INTERVAL = 0x7fffffff;
-
-const SITE_NAMES = ["yandex.com", "yandex.by", "yandex.kz", "yandex.ru", "yandex.com.tr", "yandex.ua"];
-
-const DEFAULT_PREFERENCE = {
-	lang: "auto",
-	site: 3,
-	inbox: true,
-	interval: 30,
-	showToolbarNumber: true,
-	showPopup: true,
-	resetCounter: false,
-	reUseExistingMailTab: true,
-	openBehavior: 1,
-	enableNotifications: true,
-};
 
 const $ = (id) => document.getElementById(id);
 
