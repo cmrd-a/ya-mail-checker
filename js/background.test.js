@@ -1,7 +1,6 @@
 import { jest } from '@jest/globals';
-import { chrome } from 'jest-chrome';
 
-global.chrome = chrome;
+global.chrome = {};
 
 // Specifically mock things that background.js expects at the top level
 global.chrome.action = {
@@ -41,6 +40,26 @@ global.chrome.offscreen = {
     hasDocument: jest.fn().mockResolvedValue(false),
     createDocument: jest.fn().mockResolvedValue(),
     closeDocument: jest.fn().mockResolvedValue()
+};
+
+global.chrome.i18n = {
+    getUILanguage: jest.fn()
+};
+
+global.chrome.notifications = {
+    onClicked: { addListener: jest.fn() },
+    create: jest.fn(),
+    clear: jest.fn()
+};
+
+global.chrome.tabs = {
+    create: jest.fn(),
+    query: jest.fn().mockResolvedValue([]),
+    update: jest.fn()
+};
+
+global.chrome.windows = {
+    update: jest.fn()
 };
 
 // Let jest use fake timers
@@ -101,5 +120,48 @@ describe('fetchText', () => {
 
         // Ensure no timeouts are left pending
         expect(jest.getTimerCount()).toBe(0);
+    });
+});
+
+describe('resolveLang', () => {
+    beforeEach(() => {
+        global.chrome.i18n.getUILanguage = jest.fn();
+    });
+
+    it('returns "en" when lang is "en"', () => {
+        expect(bg.resolveLang({ lang: 'en' })).toBe('en');
+    });
+
+    it('returns "ru" when lang is "ru"', () => {
+        expect(bg.resolveLang({ lang: 'ru' })).toBe('ru');
+    });
+
+    it('falls back to "en" for unsupported languages', () => {
+        expect(bg.resolveLang({ lang: 'fr' })).toBe('en');
+    });
+
+    it('defaults to "auto" and resolves to "en" when chrome.i18n is not ru', () => {
+        global.chrome.i18n.getUILanguage.mockReturnValue('en-US');
+        expect(bg.resolveLang({})).toBe('en');
+    });
+
+    it('defaults to "auto" and resolves to "ru" when chrome.i18n starts with ru', () => {
+        global.chrome.i18n.getUILanguage.mockReturnValue('ru-RU');
+        expect(bg.resolveLang({})).toBe('ru');
+    });
+
+    it('defaults to "auto" and resolves to "ru" when chrome.i18n is ru', () => {
+        global.chrome.i18n.getUILanguage.mockReturnValue('ru');
+        expect(bg.resolveLang({ lang: 'auto' })).toBe('ru');
+    });
+
+    it('handles missing chrome.i18n.getUILanguage method gracefully', () => {
+        global.chrome.i18n.getUILanguage = undefined;
+        expect(bg.resolveLang({ lang: 'auto' })).toBe('en');
+    });
+
+    it('handles null preferences', () => {
+        global.chrome.i18n.getUILanguage.mockReturnValue('ru-RU');
+        expect(bg.resolveLang(null)).toBe('ru');
     });
 });

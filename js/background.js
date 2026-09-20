@@ -29,7 +29,7 @@ let lastUnreadCount = -1;
 // Localization (locale chosen in settings)
 //================================================
 // Map the stored language ("auto"/"en"/"ru") to a concrete supported locale.
-function resolveLang(prefs) {
+export function resolveLang(prefs) {
 	let lang = prefs?.lang || "auto";
 	if (lang === "auto") {
 		const ui = (chrome.i18n.getUILanguage?.() || "en").toLowerCase();
