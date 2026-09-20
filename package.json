@@ -1,0 +1,14 @@
+{
+  "name": "yandex-mail-checker",
+  "version": "1.0.0",
+  "description": "Watcher for Yandex Mail",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@babel/preset-env": "^7.20.0",
+    "@babel/plugin-transform-modules-commonjs": "^7.20.0",
+    "jest": "^29.5.0"
+  }
+}
