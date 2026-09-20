@@ -97,76 +97,60 @@ export function analyzeMessagesHTML(input) {
 }
 
 export function analyzeHTML(input, inboxPref) {
-	let totalCount = -1;
-	let output = input;
-
-	if (output.length === 0) {
+	if (!input || input.length === 0) {
 		return -3;
 	}
-	if (output.indexOf('type="password"') !== -1 || output.indexOf("type='password'") !== -1) {
+	if (input.includes('type="password"') || input.includes("type='password'")) {
 		return -2;
 	}
 
-	let index = output.indexOf('<div class="b-folders">');
-	if (index === -1) {
-		return -1;
-	}
-	output = output.substr(index + 23);
-	index = output.indexOf("</div>");
-	if (index === -1) {
-		return -1;
-	}
-	output = output.split("</div>", 1).toString();
-	if (output.indexOf('href="/lite/inbox"') === -1) {
+	const foldersStart = input.indexOf('<div class="b-folders">');
+	if (foldersStart === -1) {
 		return -1;
 	}
 
-	// Inbox folder count.
-	let output1 = output.split('href="/lite/inbox', 1).toString();
-	index = output1.indexOf('class="b-folders__folder__num"');
-	if (index === -1) {
-		totalCount = 0;
-	} else {
-		output1 = output1.substr(index + 30);
-		index = output1.indexOf(">");
-		if (index === -1) { return -1; }
-		output1 = output1.substr(index + 1);
-		index = output1.indexOf("</span>");
-		if (index === -1) { return -1; }
-		output1 = output1.split("</span>", 1).toString();
-		if (!NUMBER_PATTERN.test(output1)) { return -1; }
-		totalCount = Number(output1.replace(/,/g, ""));
+	const foldersEnd = input.indexOf('</div>', foldersStart);
+	if (foldersEnd === -1) {
+		return -1;
+	}
+
+	const foldersHtml = input.slice(foldersStart, foldersEnd);
+	if (!foldersHtml.includes('href="/lite/inbox"')) {
+		return -1;
+	}
+
+	let totalCount = 0;
+
+	// Inbox folder count
+	const inboxChunk = foldersHtml.split('href="/lite/inbox"')[0];
+	const inboxNumMatch = inboxChunk.match(/class="b-folders__folder__num"[^>]*>\s*([\s\S]*?)\s*<\/span>/);
+	if (inboxNumMatch) {
+		const numStr = inboxNumMatch[1].trim();
+		if (!NUMBER_PATTERN.test(numStr)) return -1;
+		totalCount = Number(numStr.replace(/,/g, ""));
 	}
 
 	// Optionally fold in unread counters of custom labels.
-	if (totalCount !== -1 && inboxPref) {
-		index = output.indexOf("</a>");
-		while (index !== -1) {
-			const anchor = output.split("</a>", 1).toString();
-			output = output.substr(index + 4);
-			const numIndex = anchor.indexOf('class="b-folders__folder__num"');
-			if (numIndex !== -1) {
-				let value = anchor.substr(numIndex + 30);
-				let gt = value.indexOf(">");
-				if (gt === -1) { return -1; }
-				value = value.substr(gt + 1);
+	if (inboxPref) {
+		const chunks = foldersHtml.split("</a>");
+		chunks.pop(); // Remove the trailing chunk after the last </a>
 
-				const hrefIndex = anchor.indexOf('href="');
-				if (hrefIndex === -1) { return -1; }
-				let href = anchor.substr(hrefIndex + 6);
-				const quote = href.indexOf('"');
-				if (quote === -1) { return -1; }
-				href = href.split('"', 1).toString();
+		for (const chunk of chunks) {
+			const numMatch = chunk.match(/class="b-folders__folder__num"[^>]*>\s*([\s\S]*?)\s*<\/span>/);
+			if (numMatch) {
+				const numStr = numMatch[1].trim();
+				const hrefMatch = chunk.match(/href="([^"]+)"/);
 
-				if (href !== "/lite/inbox" && href !== "/lite/sent" && href !== "/lite/trash" && href !== "/lite/spam") {
-					const spanEnd = value.indexOf("</span>");
-					if (spanEnd === -1) { return -1; }
-					value = value.split("</span>", 1).toString();
-					if (!NUMBER_PATTERN.test(value)) { return -1; }
-					totalCount += Number(value.replace(/,/g, ""));
+				if (hrefMatch) {
+					const href = hrefMatch[1];
+					if (href !== "/lite/inbox" && href !== "/lite/sent" && href !== "/lite/trash" && href !== "/lite/spam") {
+						if (!NUMBER_PATTERN.test(numStr)) return -1;
+						totalCount += Number(numStr.replace(/,/g, ""));
+					}
+				} else {
+					return -1;
 				}
 			}
-			index = output.indexOf("</a>");
 		}
 	}
 
