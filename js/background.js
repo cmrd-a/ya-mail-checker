@@ -219,43 +219,49 @@ function setChecking() {
 	chrome.action.setBadgeText({ text: "…" });
 }
 
+
+const STATE_CONFIG = {
+	unread: {
+		icon: true,
+		getText: (count, prefs) => prefs?.showToolbarNumber && count > 0 ? String(count) : "",
+		getTitle: (label, count) => `${label}: ${t("statusUnread", [String(count)])}`
+	},
+	empty: {
+		icon: true,
+		getText: () => "",
+		getTitle: (label) => `${label}: ${t("statusEmpty")}`
+	},
+	loggedout: {
+		icon: false,
+		getText: () => "",
+		getTitle: (label) => `${label}: ${t("statusLoggedOut")}`
+	},
+	disconnected: {
+		icon: false,
+		getText: () => "",
+		getTitle: (label) => `${label}: ${t("statusDisconnected")}`
+	},
+	timeout: {
+		icon: false,
+		getText: () => "",
+		getTitle: (label) => `${label}: ${t("statusTimeout")}`
+	},
+	unknown: {
+		icon: false,
+		getText: () => "?",
+		getTitle: (label) => `${label}: ${t("statusUnknown")}`
+	}
+};
+
 // Render the toolbar icon, badge and tooltip for a given check result.
 function applyState(state, count, prefs) {
 	const label = mailLabel();
 	chrome.action.setBadgeBackgroundColor({ color: BADGE_COLOR });
 
-	switch (state) {
-		case "unread":
-			setActionIcon(true);
-			chrome.action.setBadgeText({ text: prefs?.showToolbarNumber && count > 0 ? String(count) : "" });
-			chrome.action.setTitle({ title: `${label}: ${t("statusUnread", [String(count)])}` });
-			break;
-		case "empty":
-			setActionIcon(true);
-			chrome.action.setBadgeText({ text: "" });
-			chrome.action.setTitle({ title: `${label}: ${t("statusEmpty")}` });
-			break;
-		case "loggedout":
-			setActionIcon(false);
-			chrome.action.setBadgeText({ text: "" });
-			chrome.action.setTitle({ title: `${label}: ${t("statusLoggedOut")}` });
-			break;
-		case "disconnected":
-			setActionIcon(false);
-			chrome.action.setBadgeText({ text: "" });
-			chrome.action.setTitle({ title: `${label}: ${t("statusDisconnected")}` });
-			break;
-		case "timeout":
-			setActionIcon(false);
-			chrome.action.setBadgeText({ text: "" });
-			chrome.action.setTitle({ title: `${label}: ${t("statusTimeout")}` });
-			break;
-		default:
-			setActionIcon(false);
-			chrome.action.setBadgeText({ text: "?" });
-			chrome.action.setTitle({ title: `${label}: ${t("statusUnknown")}` });
-			break;
-	}
+	const config = STATE_CONFIG[state] || STATE_CONFIG.unknown;
+	setActionIcon(config.icon);
+	chrome.action.setBadgeText({ text: config.getText(count, prefs) });
+	chrome.action.setTitle({ title: config.getTitle(label, count) });
 }
 
 
