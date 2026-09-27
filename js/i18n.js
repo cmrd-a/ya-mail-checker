@@ -87,3 +87,6 @@ I18N.ready.then(() => {
 		I18N.localizePage();
 	}
 });
+
+// Export for testing
+export { I18N };
