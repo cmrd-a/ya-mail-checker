@@ -1,7 +1,7 @@
 //================================================================
 // Popup - Manifest V3 (message passing)
 //================================================================
-"use strict";
+import { I18N } from "./i18n.js";
 
 const AVATAR_COLORS = ["#ec3a2f", "#2f7dec", "#2fbf71", "#b23fec", "#d98c00", "#0fb5c9", "#ec3f8e", "#6b7f99"];
 const LAST_CHECKED_REFRESH_MS = 30000;

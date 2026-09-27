@@ -1,10 +1,23 @@
+export function substituteMessage(entry, key, subs) {
+	if (!entry?.message) {
+		try { return chrome.i18n.getMessage(key, subs) || key; } catch { return key; }
+	}
+	let text = entry.message;
+	if (entry.placeholders) {
+		for (const [name, def] of Object.entries(entry.placeholders)) {
+			text = text.replace(new RegExp(`\\$${name}\\$`, "gi"), def.content ?? "");
+		}
+	}
+	const args = subs == null ? [] : Array.isArray(subs) ? subs : [subs];
+	text = text.replace(/\$(\d+)/g, (_, n) => args[Number(n) - 1] ?? "");
+	return text;
+}
+
 //================================================================
 // i18n helper: loads a locale chosen in settings (not the browser
 // UI language) and fills [data-i18n] / [data-i18n-value] elements.
 //================================================================
-"use strict";
-
-class I18N {
+export class I18N {
 	static #AVAILABLE = ["en", "ru"];
 	static #messages = {};
 
@@ -44,19 +57,7 @@ class I18N {
 
 	// Look up a string with chrome.i18n-style placeholder substitution.
 	static getMessage(key, subs) {
-		const entry = I18N.#messages[key];
-		if (!entry?.message) {
-			try { return chrome.i18n.getMessage(key, subs) || key; } catch { return key; }
-		}
-		let text = entry.message;
-		if (entry.placeholders) {
-			for (const [name, def] of Object.entries(entry.placeholders)) {
-				text = text.replace(new RegExp(`\\$${name}\\$`, "gi"), def.content ?? "");
-			}
-		}
-		const args = subs == null ? [] : Array.isArray(subs) ? subs : [subs];
-		text = text.replace(/\$(\d+)/g, (_, n) => args[Number(n) - 1] ?? "");
-		return text;
+		return substituteMessage(I18N.#messages[key], key, subs);
 	}
 
 	// Fill [data-i18n] text and [data-i18n-value] values from the locale.
@@ -80,10 +81,12 @@ class I18N {
 	static ready = I18N.#init();
 }
 
-I18N.ready.then(() => {
-	if (document.readyState === "loading") {
-		document.addEventListener("DOMContentLoaded", I18N.localizePage);
-	} else {
-		I18N.localizePage();
-	}
-});
+if (typeof document !== "undefined") {
+	I18N.ready.then(() => {
+		if (document.readyState === "loading") {
+			document.addEventListener("DOMContentLoaded", I18N.localizePage);
+		} else {
+			I18N.localizePage();
+		}
+	});
+}

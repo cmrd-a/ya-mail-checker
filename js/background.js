@@ -2,6 +2,7 @@
 // Yandex Mail checker - Manifest V3 service worker
 //================================================================
 import { analyzeHTML, analyzeMessagesHTML, checkEmailURL, emailURL, matchPattern } from "./edition.js";
+import { substituteMessage } from "./i18n.js";
 import { getPreference } from "./preferences.js";
 
 const ALARM_NAME = "checkMail";
@@ -55,19 +56,7 @@ async function loadMessages(prefs) {
 
 // Look up a localized string with chrome.i18n-style placeholder substitution.
 function t(key, subs) {
-	const entry = i18nMessages[key];
-	if (!entry?.message) {
-		try { return chrome.i18n.getMessage(key, subs) || key; } catch { return key; }
-	}
-	let text = entry.message;
-	if (entry.placeholders) {
-		for (const [name, def] of Object.entries(entry.placeholders)) {
-			text = text.replace(new RegExp(`\\$${name}\\$`, "gi"), def.content ?? "");
-		}
-	}
-	const args = subs == null ? [] : Array.isArray(subs) ? subs : [subs];
-	text = text.replace(/\$(\d+)/g, (_, n) => args[Number(n) - 1] ?? "");
-	return text;
+	return substituteMessage(i18nMessages[key], key, subs);
 }
 
 
