@@ -50,6 +50,58 @@ const SNIPPET_REGEX_2 = /class="[^"]*b-messages__message__firstline[^"]*"[^>]*>(
 const SNIPPET_REGEX_3 = /class="[^"]*b-messages__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/;
 const NBSP_REGEX = /&nbsp;/g;
 
+function parseMessageBlock(block) {
+	const isUnread = block.includes('b-message_unread') || block.includes('b-messages__message_unread');
+
+	let href = '';
+	const hrefMatch = block.match(HREF_REGEX);
+	if (hrefMatch) href = hrefMatch[1];
+
+	let sender = '';
+	const senderTitleMatch = block.match(SENDER_TITLE_REGEX);
+	if (senderTitleMatch) {
+		sender = senderTitleMatch[1];
+	} else {
+		const senderMatch = block.match(SENDER_TEXT_REGEX_1) ||
+		                    block.match(SENDER_TEXT_REGEX_2) ||
+		                    block.match(SENDER_TEXT_REGEX_3);
+		if (senderMatch) sender = senderMatch[1].trim();
+	}
+
+	let subject = '';
+	const subjectMatch = block.match(SUBJECT_REGEX_1) ||
+	                     block.match(SUBJECT_REGEX_2) ||
+	                     block.match(SUBJECT_REGEX_3);
+	if (subjectMatch) subject = subjectMatch[1].trim().replace(NBSP_REGEX, ' ');
+
+	let snippet = '';
+	const snippetMatch = block.match(SNIPPET_REGEX_1) ||
+	                     block.match(SNIPPET_REGEX_2) ||
+	                     block.match(SNIPPET_REGEX_3);
+	if (snippetMatch) snippet = snippetMatch[1].trim().replace(NBSP_REGEX, ' ');
+
+	let actionField = null;
+	let actionValue = null;
+	const actionMatch = block.match(ACTION_CHECKBOX_REGEX);
+	if (actionMatch) {
+		actionField = actionMatch[1];
+		actionValue = actionMatch[2];
+	}
+
+	if (href) {
+		return {
+			isUnread,
+			href,
+			sender,
+			subject,
+			snippet,
+			actionField,
+			actionValue
+		};
+	}
+	return null;
+}
+
 // Returns: -3 not connected, -2 logged out, -1 unknown response, 0+ unread count.
 // The scraping logic is intentionally kept close to the original to preserve
 // the exact parsing behavior against Yandex lite markup. inboxPref mirrors the
@@ -106,53 +158,9 @@ export function analyzeMessagesHTML(input) {
 	}
 
 	for (const block of messageBlocks) {
-		const isUnread = block.includes('b-message_unread') || block.includes('b-messages__message_unread');
-
-		let href = '';
-		const hrefMatch = block.match(HREF_REGEX);
-		if (hrefMatch) href = hrefMatch[1];
-
-		let sender = '';
-		const senderTitleMatch = block.match(SENDER_TITLE_REGEX);
-		if (senderTitleMatch) {
-			sender = senderTitleMatch[1];
-		} else {
-			const senderMatch = block.match(SENDER_TEXT_REGEX_1) ||
-			                    block.match(SENDER_TEXT_REGEX_2) ||
-			                    block.match(SENDER_TEXT_REGEX_3);
-			if (senderMatch) sender = senderMatch[1].trim();
-		}
-
-		let subject = '';
-		const subjectMatch = block.match(SUBJECT_REGEX_1) ||
-		                     block.match(SUBJECT_REGEX_2) ||
-		                     block.match(SUBJECT_REGEX_3);
-		if (subjectMatch) subject = subjectMatch[1].trim().replace(NBSP_REGEX, ' ');
-
-		let snippet = '';
-		const snippetMatch = block.match(SNIPPET_REGEX_1) ||
-		                     block.match(SNIPPET_REGEX_2) ||
-		                     block.match(SNIPPET_REGEX_3);
-		if (snippetMatch) snippet = snippetMatch[1].trim().replace(NBSP_REGEX, ' ');
-
-		let actionField = null;
-		let actionValue = null;
-		const actionMatch = block.match(ACTION_CHECKBOX_REGEX);
-		if (actionMatch) {
-			actionField = actionMatch[1];
-			actionValue = actionMatch[2];
-		}
-
-		if (href) {
-			messages.push({
-				isUnread,
-				href,
-				sender,
-				subject,
-				snippet,
-				actionField,
-				actionValue
-			});
+		const parsed = parseMessageBlock(block);
+		if (parsed) {
+			messages.push(parsed);
 		}
 	}
 
