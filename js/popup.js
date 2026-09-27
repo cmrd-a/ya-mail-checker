@@ -191,3 +191,4 @@ window.addEventListener("contextmenu", (event) => {
 	event.stopPropagation();
 	return false;
 });
+export { formatAgo };
