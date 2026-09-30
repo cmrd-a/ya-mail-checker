@@ -1,20 +1,33 @@
+/**
+ * @jest-environment jsdom
+ */
 import { jest } from '@jest/globals';
-import { chrome } from 'jest-chrome';
 
-global.I18N = {
-    ready: Promise.resolve(),
-    getMessage: jest.fn((key, subs) => {
-        if (key === 'statusEmpty') return 'No unread messages';
-        if (key === 'lastChecked') return 'Checked ' + (subs ? subs[0] : '');
-        if (key === 'deleteMail') return 'Delete';
-        if (key === 'justNow') return 'just now';
-        if (key === 'minutesAgo') return `${subs[0]}m ago`;
-        if (key === 'hoursAgo') return `${subs[0]}h ago`;
-        return key;
-    })
+// Inline chrome mock (stand-in for jest-chrome, which is incompatible with Jest 30).
+const chromeMock = {
+    runtime: {
+        sendMessage: jest.fn(),
+        openOptionsPage: jest.fn()
+    }
 };
+global.chrome = chromeMock;
 
-global.chrome = chrome;
+// popup.js imports I18N from the i18n module, so mock it at the module level.
+jest.unstable_mockModule('../js/i18n.js', () => ({
+    I18N: {
+        ready: Promise.resolve(),
+        getMessage: jest.fn((key, subs) => {
+            if (key === 'statusEmpty') return 'No unread messages';
+            if (key === 'lastChecked') return 'Checked ' + (subs ? subs[0] : '');
+            if (key === 'deleteMail') return 'Delete';
+            if (key === 'justNow') return 'just now';
+            if (key === 'minutesAgo') return `${subs[0]}m ago`;
+            if (key === 'hoursAgo') return `${subs[0]}h ago`;
+            return key;
+        })
+    }
+}));
+
 global.setInterval = jest.fn(); // Prevent open handle for setInterval
 
 describe('popup.js', () => {
@@ -41,9 +54,8 @@ describe('popup.js', () => {
         windowCloseSpy = jest.fn();
         window.close = windowCloseSpy;
 
-        chrome.runtime.sendMessage.mockClear();
-        chrome.runtime.openOptionsPage.mockClear();
-        global.I18N.getMessage.mockClear();
+        global.chrome.runtime.sendMessage.mockClear();
+        global.chrome.runtime.openOptionsPage.mockClear();
         global.setInterval.mockClear();
     });
 
@@ -57,15 +69,23 @@ describe('popup.js', () => {
     describe('formatAgo', () => {
         it('returns empty string if no timestamp', () => {
             expect(popupModule._testFormatAgo(null)).toBe('');
+            expect(popupModule._testFormatAgo(undefined)).toBe('');
+            expect(popupModule._testFormatAgo(0)).toBe('');
         });
         it('returns just now if diffSec < 45', () => {
             expect(popupModule._testFormatAgo(Date.now() - 10000)).toBe('just now');
+            expect(popupModule._testFormatAgo(Date.now() - 44000)).toBe('just now');
         });
         it('returns minutesAgo if diffSec < 3600', () => {
             expect(popupModule._testFormatAgo(Date.now() - 120000)).toBe('2m ago');
+            expect(popupModule._testFormatAgo(Date.now() - 3540000)).toBe('59m ago');
         });
         it('returns hoursAgo if diffSec >= 3600', () => {
             expect(popupModule._testFormatAgo(Date.now() - 7200000)).toBe('2h ago');
+            expect(popupModule._testFormatAgo(Date.now() - 86400000)).toBe('24h ago');
+        });
+        it('handles future timestamps by clamping to just now', () => {
+            expect(popupModule._testFormatAgo(Date.now() + 60000)).toBe('just now');
         });
     });
 
@@ -109,21 +129,21 @@ describe('popup.js', () => {
             await flushPromises();
 
             document.getElementById("openMail").click();
-            expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: "openMail" });
+            expect(global.chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: "openMail" });
             expect(windowCloseSpy).toHaveBeenCalled();
 
             document.getElementById("openMailTitle").click();
-            expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: "openMail" });
+            expect(global.chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: "openMail" });
 
             document.getElementById("checkNow").click();
-            expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: "checkNow" });
+            expect(global.chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: "checkNow" });
 
             document.getElementById("options").click();
-            expect(chrome.runtime.openOptionsPage).toHaveBeenCalled();
+            expect(global.chrome.runtime.openOptionsPage).toHaveBeenCalled();
         });
 
         it('renders empty state when no messages', async () => {
-            chrome.runtime.sendMessage.mockImplementation((msg, callback) => {
+            global.chrome.runtime.sendMessage.mockImplementation((msg, callback) => {
                 if (msg.type === "getMessages" && callback) {
                     callback({ messages: [], lastCheckedAt: Date.now() - 1000, unreadCount: 0 });
                 }
@@ -159,7 +179,7 @@ describe('popup.js', () => {
                 }
             ];
 
-            chrome.runtime.sendMessage.mockImplementation((msg, callback) => {
+            global.chrome.runtime.sendMessage.mockImplementation((msg, callback) => {
                 if (msg.type === "getMessages" && callback) {
                     callback({ messages, lastCheckedAt: Date.now() - 1000, unreadCount: 1 });
                 } else if (msg.type === "deleteMessage" && callback) {
@@ -182,7 +202,7 @@ describe('popup.js', () => {
             const deleteBtn = items[0].querySelector(".email-delete-btn");
             deleteBtn.click();
 
-            expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+            expect(global.chrome.runtime.sendMessage).toHaveBeenCalledWith(
                 { type: "deleteMessage", actionField: "msg1", actionValue: "val1" },
                 expect.any(Function)
             );
@@ -205,7 +225,7 @@ describe('popup.js', () => {
                 }
             ];
 
-            chrome.runtime.sendMessage.mockImplementation((msg, callback) => {
+            global.chrome.runtime.sendMessage.mockImplementation((msg, callback) => {
                 if (msg.type === "getMessages" && callback) {
                     callback({ messages, lastCheckedAt: Date.now() - 1000, unreadCount: 1 });
                 } else if (msg.type === "deleteMessage" && callback) {
@@ -247,7 +267,7 @@ describe('popup.js', () => {
                 }
             ];
 
-            chrome.runtime.sendMessage.mockImplementation((msg, callback) => {
+            global.chrome.runtime.sendMessage.mockImplementation((msg, callback) => {
                 if (msg.type === "getMessages" && callback) {
                     callback({ messages, lastCheckedAt: Date.now() - 1000, unreadCount: 1 });
                 }
@@ -261,7 +281,7 @@ describe('popup.js', () => {
 
             items[0].click();
 
-            expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: "openMail", url: "/mail/1" });
+            expect(global.chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: "openMail", url: "/mail/1" });
             expect(windowCloseSpy).toHaveBeenCalled();
         });
 

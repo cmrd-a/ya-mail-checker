@@ -2,9 +2,21 @@
  * @jest-environment jsdom
  */
 import { jest } from '@jest/globals';
-import { chrome } from 'jest-chrome';
 
-Object.assign(globalThis, { chrome });
+// Inline chrome mock (stand-in for jest-chrome, which is incompatible with Jest 30).
+const chromeMock = {
+    runtime: {
+        getManifest: jest.fn(),
+        sendMessage: jest.fn()
+    },
+    storage: {
+        local: {
+            get: jest.fn().mockResolvedValue({}),
+            set: jest.fn().mockResolvedValue()
+        }
+    }
+};
+Object.assign(globalThis, { chrome: chromeMock });
 
 let mockPrefs = {
     lang: "en",
@@ -34,11 +46,13 @@ jest.unstable_mockModule('../js/edition.js', () => ({
     siteNames: ['yandex.com', 'yandex.ru']
 }));
 
-global.I18N = {
-    getMessage: jest.fn((key) => `Msg:${key}`),
-    ready: Promise.resolve(),
-    reload: jest.fn().mockResolvedValue()
-};
+jest.unstable_mockModule('../js/i18n.js', () => ({
+    I18N: {
+        getMessage: jest.fn((key) => `Msg:${key}`),
+        ready: Promise.resolve(),
+        reload: jest.fn().mockResolvedValue()
+    }
+}));
 
 describe('options.js', () => {
     beforeEach(async () => {
