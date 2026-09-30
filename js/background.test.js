@@ -296,6 +296,21 @@ describe('deleteMessage', () => {
     const body = new URLSearchParams(postCall[1].body);
     expect(body.get('tids')).toBe('191684459139976958:9');
   });
+
+  it('returns false when the action POST request throws a network error', async () => {
+    editionMock.analyzeHTML.mockReturnValue(3);
+
+    // First call (GET) succeeds, second call (POST) throws
+    global.fetch.mockImplementation(async (url, options) => {
+      if (!options || options.method === 'GET') {
+        return { text: jest.fn().mockResolvedValue('<input type="hidden" name="_ckey" value="tokerr">') };
+      }
+      throw new Error('Network failure');
+    });
+
+    const ok = await bg.deleteMessage(prefs, 'ids', '12345');
+    expect(ok).toBe(false);
+  });
 });
 
 describe('background.js', () => {
