@@ -60,26 +60,24 @@ export function analyzeMessagesHTML(input) {
 	let index = input.indexOf('class="b-messages"');
 	if (index === -1) return messages;
 
-	let output = input.substr(index);
-
 	const messageBlocks = [];
-	let currentPos = 0;
+	let currentPos = index;
 	while (true) {
-		let divStart = output.indexOf('<div', currentPos);
+		let divStart = input.indexOf('<div', currentPos);
 		if (divStart === -1) break;
 
-		let tagEnd = output.indexOf('>', divStart);
+		let tagEnd = input.indexOf('>', divStart);
 		if (tagEnd === -1) break;
 
-		let divTag = output.substring(divStart, tagEnd + 1);
+		let divTag = input.substring(divStart, tagEnd + 1);
 
 		if (divTag.includes('class="') && (divTag.includes('b-messages__message') || divTag.includes('b-message '))) {
 			let depth = 1;
 			let innerPos = tagEnd + 1;
 
-			while (depth > 0 && innerPos < output.length) {
-				let nextDiv = output.indexOf('<div', innerPos);
-				let nextClose = output.indexOf('</div', innerPos);
+			while (depth > 0 && innerPos < input.length) {
+				let nextDiv = input.indexOf('<div', innerPos);
+				let nextClose = input.indexOf('</div', innerPos);
 
 				if (nextClose === -1) break;
 
@@ -93,11 +91,11 @@ export function analyzeMessagesHTML(input) {
 			}
 
 			if (depth === 0) {
-				messageBlocks.push(output.substring(divStart, innerPos));
+				messageBlocks.push(input.substring(divStart, innerPos));
 				currentPos = innerPos;
 				continue;
 			} else {
-				messageBlocks.push(output.substring(divStart));
+				messageBlocks.push(input.substring(divStart));
 				break;
 			}
 		}
