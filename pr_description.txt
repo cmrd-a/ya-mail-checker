@@ -1,0 +1,13 @@
+🧪 Add test coverage for options.js
+
+🎯 **What:** The testing gap for `options.js` is addressed. Previously there was no test file for the options page. We've introduced a comprehensive Jest test file that leverages jsdom and jest-chrome to verify the behavior of the options UI.
+
+📊 **Coverage:** The new tests cover:
+- Initialization of the form mapping the correct preference state to DOM elements.
+- The real-time update of the auto check text when the range slider is interacted with (handling boundaries correctly).
+- The dynamic disabling/enabling of the "quiet hours" inputs when the feature is toggled.
+- The save behavior mapping the varied "open behavior" radio options.
+- The robust fallback for options missing in certain browsers (like `enableNotifications`).
+- The temporary visibility of the "saved" status message using simulated timers.
+
+✨ **Result:** Test coverage significantly improves the robustness of UI state management. Potential regression issues concerning form state saving/loading are mitigated.
