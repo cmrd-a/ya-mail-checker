@@ -3,6 +3,12 @@
 //================================================================
 import { I18N } from "./i18n.js";
 
+export const _testFormatAgo = (timestamp) => formatAgo(timestamp);
+export const _testHashCode = (str) => hashCode(str);
+export const _testBuildAvatar = (name) => buildAvatar(name);
+export const _testBuildIcon = (paths) => buildIcon(paths);
+
+
 const AVATAR_COLORS = ["#ec3a2f", "#2f7dec", "#2fbf71", "#b23fec", "#d98c00", "#0fb5c9", "#ec3f8e", "#6b7f99"];
 const LAST_CHECKED_REFRESH_MS = 30000;
 
