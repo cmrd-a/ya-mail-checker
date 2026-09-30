@@ -122,6 +122,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 			headerCount.textContent = current > 1 ? String(current - 1) : "";
 		};
 
+		const fragment = document.createDocumentFragment();
 		messages.forEach(msg => {
 			const item = document.createElement("div");
 			item.className = "email-item" + (msg.isUnread ? " unread" : "");
@@ -186,8 +187,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 				close();
 			});
 
-			list.appendChild(item);
+			fragment.appendChild(item);
 		});
+
+		list.appendChild(fragment);
 	});
 });
 
