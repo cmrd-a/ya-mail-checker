@@ -1,7 +1,7 @@
 //================================================================
 // Options - Manifest V3 (chrome.storage based)
 //================================================================
-"use strict";
+import { I18N } from "./i18n.js";
 
 import { getPreference } from "./preferences.js";
 import { siteNames as SITE_NAMES } from "./edition.js";
