@@ -39,16 +39,30 @@ const HREF_REGEX = /href="(\/lite\/(?:message|thread)\/[^"]+)"/;
 // is present is what messages-action.xml expects for that row.
 const ACTION_CHECKBOX_REGEX = /<input type="checkbox" name="(ids|tids)" class="b-form-checkbox" value="([^"]+)"/;
 const SENDER_TITLE_REGEX = /class="[^"]*b-message__from[^"]*"[^>]*title="([^"]+)"/;
-const SENDER_TEXT_REGEX_1 = /class="[^"]*b-message__from__text[^"]*"[^>]*>([^<]+)<\/span>/;
-const SENDER_TEXT_REGEX_2 = /class="[^"]*b-messages__message__sender[^"]*"[^>]*>([^<]+)<\/span>/;
-const SENDER_TEXT_REGEX_3 = /class="[^"]*b-messages__from__text[^"]*"[^>]*>(?:<span[^>]*>)?([^<]+)<\/span>/;
-const SUBJECT_REGEX_1 = /class="[^"]*b-message__subject__text[^"]*"[^>]*>([\s\S]*?)<\/span>/;
-const SUBJECT_REGEX_2 = /class="[^"]*b-messages__message__subject[^"]*"[^>]*>([\s\S]*?)<\/span>/;
-const SUBJECT_REGEX_3 = /class="[^"]*b-messages__subject[^"]*"[^>]*>(?:<span[^>]*>)?([\s\S]*?)<\/span>/;
-const SNIPPET_REGEX_1 = /class="[^"]*b-message__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/;
-const SNIPPET_REGEX_2 = /class="[^"]*b-messages__message__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/;
-const SNIPPET_REGEX_3 = /class="[^"]*b-messages__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/;
+const SENDER_TEXT_REGEXES = [
+	/class="[^"]*b-message__from__text[^"]*"[^>]*>([^<]+)<\/span>/,
+	/class="[^"]*b-messages__message__sender[^"]*"[^>]*>([^<]+)<\/span>/,
+	/class="[^"]*b-messages__from__text[^"]*"[^>]*>(?:<span[^>]*>)?([^<]+)<\/span>/
+];
+const SUBJECT_REGEXES = [
+	/class="[^"]*b-message__subject__text[^"]*"[^>]*>([\s\S]*?)<\/span>/,
+	/class="[^"]*b-messages__message__subject[^"]*"[^>]*>([\s\S]*?)<\/span>/,
+	/class="[^"]*b-messages__subject[^"]*"[^>]*>(?:<span[^>]*>)?([\s\S]*?)<\/span>/
+];
+const SNIPPET_REGEXES = [
+	/class="[^"]*b-message__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/,
+	/class="[^"]*b-messages__message__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/,
+	/class="[^"]*b-messages__firstline[^"]*"[^>]*>([\s\S]*?)<\/span>/
+];
 const NBSP_REGEX = /&nbsp;/g;
+
+function matchAny(text, regexes) {
+	for (const regex of regexes) {
+		const match = text.match(regex);
+		if (match) return match;
+	}
+	return null;
+}
 
 function parseMessageBlock(block) {
 	const isUnread = block.includes('b-message_unread') || block.includes('b-messages__message_unread');
@@ -62,22 +76,16 @@ function parseMessageBlock(block) {
 	if (senderTitleMatch) {
 		sender = senderTitleMatch[1];
 	} else {
-		const senderMatch = block.match(SENDER_TEXT_REGEX_1) ||
-		                    block.match(SENDER_TEXT_REGEX_2) ||
-		                    block.match(SENDER_TEXT_REGEX_3);
+		const senderMatch = matchAny(block, SENDER_TEXT_REGEXES);
 		if (senderMatch) sender = senderMatch[1].trim();
 	}
 
 	let subject = '';
-	const subjectMatch = block.match(SUBJECT_REGEX_1) ||
-	                     block.match(SUBJECT_REGEX_2) ||
-	                     block.match(SUBJECT_REGEX_3);
+	const subjectMatch = matchAny(block, SUBJECT_REGEXES);
 	if (subjectMatch) subject = subjectMatch[1].trim().replace(NBSP_REGEX, ' ');
 
 	let snippet = '';
-	const snippetMatch = block.match(SNIPPET_REGEX_1) ||
-	                     block.match(SNIPPET_REGEX_2) ||
-	                     block.match(SNIPPET_REGEX_3);
+	const snippetMatch = matchAny(block, SNIPPET_REGEXES);
 	if (snippetMatch) snippet = snippetMatch[1].trim().replace(NBSP_REGEX, ' ');
 
 	let actionField = null;
