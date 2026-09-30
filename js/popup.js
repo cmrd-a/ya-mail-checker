@@ -33,10 +33,15 @@ function buildIcon(paths) {
 }
 
 // Small deterministic hash so the same sender always gets the same color.
+const _hashCodeCache = new Map();
 function hashCode(str) {
+	let cached = _hashCodeCache.get(str);
+	if (cached !== undefined) return cached;
 	let h = 0;
 	for (let i = 0; i < str.length; i++) { h = (h * 31 + str.charCodeAt(i)) | 0; }
-	return Math.abs(h);
+	h = Math.abs(h);
+	_hashCodeCache.set(str, h);
+	return h;
 }
 
 // A colored circle with the sender's first initial, standing in for an avatar.
